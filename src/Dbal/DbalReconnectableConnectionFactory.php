@@ -7,17 +7,18 @@ namespace Ecotone\Dbal;
 use Ecotone\Enqueue\ReconnectableConnectionFactory;
 use Enqueue\Dbal\DbalConnectionFactory;
 use Enqueue\Dbal\DbalContext;
+use Interop\Queue\ConnectionFactory;
 use Interop\Queue\Context;
 use ReflectionClass;
 
 class DbalReconnectableConnectionFactory implements ReconnectableConnectionFactory
 {
     /**
-     * @var DbalConnectionFactory
+     * @var ConnectionFactory
      */
     private $connectionFactory;
 
-    public function __construct(DbalConnectionFactory $dbalConnectionFactory)
+    public function __construct(ConnectionFactory $dbalConnectionFactory)
     {
         $this->connectionFactory = $dbalConnectionFactory;
     }
