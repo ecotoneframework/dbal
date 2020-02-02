@@ -73,7 +73,7 @@ class DbalInboundChannelAdapterBuilder extends EnqueueInboundChannelAdapterBuild
         $connectionFactory = $referenceSearchService->get($this->connectionReferenceName);
 
         $inboundChannelAdapter = new DbalInboundChannelAdapter(
-            new CachedConnectionFactory(new DbalReconnectableConnectionFactory($connectionFactory)),
+            CachedConnectionFactory::createFor(new DbalReconnectableConnectionFactory($connectionFactory)),
             $this->buildGatewayFor($referenceSearchService, $channelResolver, $pollingMetadata),
             true,
             $this->queueName,

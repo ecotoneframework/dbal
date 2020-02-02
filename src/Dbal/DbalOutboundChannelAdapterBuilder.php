@@ -47,7 +47,7 @@ class DbalOutboundChannelAdapterBuilder extends EnqueueOutboundChannelAdapterBui
         $conversionService = $referenceSearchService->get(ConversionService::REFERENCE_NAME);
 
         return new DbalOutboundChannelAdapter(
-            new CachedConnectionFactory(new DbalReconnectableConnectionFactory($amqpConnectionFactory)),
+            CachedConnectionFactory::createFor(new DbalReconnectableConnectionFactory($amqpConnectionFactory)),
             $this->queueName,
             $this->autoDeclare,
             new OutboundMessageConverter($this->headerMapper, $conversionService, $this->defaultConversionMediaType, $this->defaultDeliveryDelay, $this->defaultTimeToLive)

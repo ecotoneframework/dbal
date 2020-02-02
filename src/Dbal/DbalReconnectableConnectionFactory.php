@@ -28,6 +28,11 @@ class DbalReconnectableConnectionFactory implements ReconnectableConnectionFacto
         return $this->connectionFactory->createContext();
     }
 
+    public function getConnectionInstanceId(): int
+    {
+        return spl_object_id($this->connectionFactory);
+    }
+
     /**
      * @param Context|null|DbalContext $context
      * @return bool
