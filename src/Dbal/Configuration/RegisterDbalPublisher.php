@@ -34,9 +34,9 @@ class RegisterDbalPublisher
      */
     private $queueName;
 
-    private function __construct(string $amqpConnectionReference, string $queueName, ?string $outputDefaultConversionMediaType, string $referenceName)
+    private function __construct(string $connectionReference, string $queueName, ?string $outputDefaultConversionMediaType, string $referenceName)
     {
-        $this->connectionReference = $amqpConnectionReference;
+        $this->connectionReference = $connectionReference;
         $this->queueName = $queueName;
         $this->outputDefaultConversionMediaType = $outputDefaultConversionMediaType;
         $this->referenceName = $referenceName;

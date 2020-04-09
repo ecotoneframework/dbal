@@ -7,35 +7,26 @@ namespace Test\Ecotone\Dbal;
 use Ecotone\Dbal\DbalReconnectableConnectionFactory;
 use Ecotone\Messaging\Handler\InMemoryReferenceSearchService;
 use Enqueue\Dbal\DbalConnectionFactory;
+use Enqueue\Dbal\ManagerRegistryConnectionFactory;
+use Interop\Queue\ConnectionFactory;
 use PHPUnit\Framework\TestCase;
 
 abstract class DbalMessagingTest extends TestCase
 {
     /**
-     * @var DbalConnectionFactory
+     * @var DbalConnectionFactory|ManagerRegistryConnectionFactory
      */
     private $dbalConnectionFactory;
 
-    /**
-     * @before
-     */
-    public function before() : void
-    {
-        $this->getConnectionFactory()->createContext()->getDbalConnection()->beginTransaction();
-    }
-
-    /**
-     * @after
-     */
-    public function after(): void
-    {
-        $this->getConnectionFactory()->createContext()->getDbalConnection()->rollBack();
-    }
-
-    public function getConnectionFactory() : DbalConnectionFactory
+    public function getConnectionFactory(bool $isRegistry = false) : ConnectionFactory
     {
         if (!$this->dbalConnectionFactory) {
-            $this->dbalConnectionFactory = new DbalConnectionFactory('pgsql://ecotone:secret@database:5432/ecotone');
+            $dbalConnectionFactory = new DbalConnectionFactory('pgsql://ecotone:secret@database:5432/ecotone');
+            $this->dbalConnectionFactory = $isRegistry
+                ? new ManagerRegistryConnectionFactory(
+                    new DbalConnectionManagerRegistryWrapper($dbalConnectionFactory)
+                )
+                : $dbalConnectionFactory;
         }
 
         return $this->dbalConnectionFactory;

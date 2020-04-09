@@ -3,20 +3,14 @@
 
 namespace Ecotone\Dbal;
 
-
-use Ecotone\Amqp\AmqpAdmin;
-use Ecotone\Amqp\AmqpInboundChannelAdapter;
-use Ecotone\Amqp\AmqpReconnectableConnectionFactory;
 use Ecotone\Enqueue\CachedConnectionFactory;
 use Ecotone\Enqueue\EnqueueInboundChannelAdapterBuilder;
 use Ecotone\Enqueue\InboundMessageConverter;
 use Ecotone\Messaging\Endpoint\ConsumerLifecycle;
-use Ecotone\Messaging\Endpoint\EntrypointGateway;
 use Ecotone\Messaging\Endpoint\PollingMetadata;
 use Ecotone\Messaging\Endpoint\TaskExecutorChannelAdapter\TaskExecutorChannelAdapter;
 use Ecotone\Messaging\Handler\ChannelResolver;
 use Ecotone\Messaging\Handler\ReferenceSearchService;
-use Enqueue\AmqpLib\AmqpConnectionFactory;
 use Enqueue\Dbal\DbalConnectionFactory;
 use Exception;
 
@@ -36,14 +30,14 @@ class DbalInboundChannelAdapterBuilder extends EnqueueInboundChannelAdapterBuild
      * @param string $endpointId
      * @param string $queueName
      * @param string|null $requestChannelName
-     * @param string $amqpConnectionReferenceName
+     * @param string $dbalConnectionReferenceName
      * @throws Exception
      */
-    private function __construct(string $endpointId, string $queueName, ?string $requestChannelName, string $amqpConnectionReferenceName)
+    private function __construct(string $endpointId, string $queueName, ?string $requestChannelName, string $dbalConnectionReferenceName)
     {
-        $this->connectionReferenceName = $amqpConnectionReferenceName;
+        $this->connectionReferenceName = $dbalConnectionReferenceName;
         $this->queueName = $queueName;
-        $this->initialize($endpointId, $requestChannelName, $amqpConnectionReferenceName);
+        $this->initialize($endpointId, $requestChannelName, $dbalConnectionReferenceName);
     }
 
     /**

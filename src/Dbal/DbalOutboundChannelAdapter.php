@@ -6,12 +6,9 @@ namespace Ecotone\Dbal;
 
 use Ecotone\Enqueue\CachedConnectionFactory;
 use Ecotone\Enqueue\OutboundMessageConverter;
-use Ecotone\Messaging\Handler\ChannelResolver;
-use Ecotone\Messaging\Handler\ReferenceSearchService;
 use Ecotone\Messaging\Message;
 use Ecotone\Messaging\MessageHandler;
 use Ecotone\Messaging\MessageHeaders;
-use Enqueue\AmqpTools\RabbitMqDlxDelayStrategy;
 use Enqueue\Dbal\DbalContext;
 use Enqueue\Dbal\DbalDestination;
 use Enqueue\Dbal\DbalMessage;

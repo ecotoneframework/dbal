@@ -12,6 +12,7 @@ use Ecotone\Messaging\Handler\ChannelResolver;
 use Ecotone\Messaging\Handler\ReferenceSearchService;
 use Ecotone\Messaging\MessageHandler;
 use Enqueue\Dbal\DbalConnectionFactory;
+use Interop\Queue\ConnectionFactory;
 
 class DbalOutboundChannelAdapterBuilder extends EnqueueOutboundChannelAdapterBuilder
 {
@@ -41,13 +42,13 @@ class DbalOutboundChannelAdapterBuilder extends EnqueueOutboundChannelAdapterBui
      */
     public function build(ChannelResolver $channelResolver, ReferenceSearchService $referenceSearchService): MessageHandler
     {
-        /** @var DbalConnectionFactory $amqpConnectionFactory */
-        $amqpConnectionFactory = $referenceSearchService->get($this->connectionFactoryReferenceName);
+        /** @var ConnectionFactory $dbalConnectionFactory */
+        $dbalConnectionFactory = $referenceSearchService->get($this->connectionFactoryReferenceName);
         /** @var ConversionService $conversionService */
         $conversionService = $referenceSearchService->get(ConversionService::REFERENCE_NAME);
 
         return new DbalOutboundChannelAdapter(
-            CachedConnectionFactory::createFor(new DbalReconnectableConnectionFactory($amqpConnectionFactory)),
+            CachedConnectionFactory::createFor(new DbalReconnectableConnectionFactory($dbalConnectionFactory)),
             $this->queueName,
             $this->autoDeclare,
             new OutboundMessageConverter($this->headerMapper, $conversionService, $this->defaultConversionMediaType, $this->defaultDeliveryDelay, $this->defaultTimeToLive)

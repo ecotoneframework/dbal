@@ -6,7 +6,7 @@ namespace Ecotone\Dbal;
 
 use Ecotone\Enqueue\CachedConnectionFactory;
 use Ecotone\Enqueue\InboundMessageConverter;
-use Ecotone\Messaging\Endpoint\EntrypointGateway;
+use Ecotone\Messaging\Endpoint\InboundChannelAdapterEntrypoint;
 use Ecotone\Messaging\Message;
 use Ecotone\Messaging\Scheduling\TaskExecutor;
 use Enqueue\Dbal\DbalContext;
@@ -20,7 +20,7 @@ class DbalInboundChannelAdapter implements TaskExecutor
      */
     private $cachedConnectionFactory;
     /**
-     * @var EntrypointGateway
+     * @var InboundChannelAdapterEntrypoint
      */
     private $entrypointGateway;
     /**
@@ -44,7 +44,7 @@ class DbalInboundChannelAdapter implements TaskExecutor
      */
     private $initialized = false;
 
-    public function __construct(CachedConnectionFactory $cachedConnectionFactory, EntrypointGateway $entrypointGateway, bool $declareOnStartup, string $queueName, int $receiveTimeoutInMilliseconds, InboundMessageConverter $inboundMessageConverter)
+    public function __construct(CachedConnectionFactory $cachedConnectionFactory, InboundChannelAdapterEntrypoint $entrypointGateway, bool $declareOnStartup, string $queueName, int $receiveTimeoutInMilliseconds, InboundMessageConverter $inboundMessageConverter)
     {
         $this->cachedConnectionFactory = $cachedConnectionFactory;
         $this->entrypointGateway = $entrypointGateway;
