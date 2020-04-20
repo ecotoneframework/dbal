@@ -26,7 +26,7 @@
     },
     "require": {
         "php": "^7.3",
-        "ecotone/enqueue": "^0.9.0",
+        "ecotone/enqueue": "^0.10.0",
         "enqueue/dbal": "^0.10.0"
     },
     "require-dev": {

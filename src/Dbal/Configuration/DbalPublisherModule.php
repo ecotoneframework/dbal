@@ -18,7 +18,7 @@ use Ecotone\Messaging\Handler\Gateway\ParameterToMessageConverter\GatewayHeaders
 use Ecotone\Messaging\Handler\Gateway\ParameterToMessageConverter\GatewayHeaderValueBuilder;
 use Ecotone\Messaging\Handler\Gateway\ParameterToMessageConverter\GatewayPayloadBuilder;
 use Ecotone\Messaging\MessageHeaders;
-use Ecotone\Messaging\Publisher;
+use Ecotone\Messaging\MessagePublisher;
 
 /**
  * @author Dariusz Gafka <dgafka.mail@gmail.com>
@@ -57,9 +57,9 @@ class DbalPublisherModule implements AnnotationModule
             }
         }
 
-        /** @var RegisterDbalPublisher $dbalPublisher */
+        /** @var DbalMessagePublisherConfiguration $dbalPublisher */
         foreach ($extensionObjects as $dbalPublisher) {
-            if (!($dbalPublisher instanceof RegisterDbalPublisher)) {
+            if (!($dbalPublisher instanceof DbalMessagePublisherConfiguration)) {
                 return;
             }
 
@@ -72,14 +72,14 @@ class DbalPublisherModule implements AnnotationModule
 
             $configuration = $configuration
                 ->registerGatewayBuilder(
-                    GatewayProxyBuilder::create($dbalPublisher->getReferenceName(), Publisher::class, "send", $dbalPublisher->getReferenceName())
+                    GatewayProxyBuilder::create($dbalPublisher->getReferenceName(), MessagePublisher::class, "send", $dbalPublisher->getReferenceName())
                         ->withParameterConverters([
                             GatewayPayloadBuilder::create("data"),
                             GatewayHeaderBuilder::create("sourceMediaType", MessageHeaders::CONTENT_TYPE)
                         ])
                 )
                 ->registerGatewayBuilder(
-                    GatewayProxyBuilder::create($dbalPublisher->getReferenceName(), Publisher::class, "sendWithMetadata", $dbalPublisher->getReferenceName())
+                    GatewayProxyBuilder::create($dbalPublisher->getReferenceName(), MessagePublisher::class, "sendWithMetadata", $dbalPublisher->getReferenceName())
                         ->withParameterConverters([
                             GatewayPayloadBuilder::create("data"),
                             GatewayHeadersBuilder::create("metadata"),
@@ -87,14 +87,14 @@ class DbalPublisherModule implements AnnotationModule
                         ])
                 )
                 ->registerGatewayBuilder(
-                    GatewayProxyBuilder::create($dbalPublisher->getReferenceName(), Publisher::class, "convertAndSend", $dbalPublisher->getReferenceName())
+                    GatewayProxyBuilder::create($dbalPublisher->getReferenceName(), MessagePublisher::class, "convertAndSend", $dbalPublisher->getReferenceName())
                         ->withParameterConverters([
                             GatewayPayloadBuilder::create("data"),
                             GatewayHeaderValueBuilder::create(MessageHeaders::CONTENT_TYPE, MediaType::APPLICATION_X_PHP)
                         ])
                 )
                 ->registerGatewayBuilder(
-                    GatewayProxyBuilder::create($dbalPublisher->getReferenceName(), Publisher::class, "convertAndSendWithMetadata", $dbalPublisher->getReferenceName())
+                    GatewayProxyBuilder::create($dbalPublisher->getReferenceName(), MessagePublisher::class, "convertAndSendWithMetadata", $dbalPublisher->getReferenceName())
                         ->withParameterConverters([
                             GatewayPayloadBuilder::create("data"),
                             GatewayHeadersBuilder::create("metadata"),
@@ -118,7 +118,7 @@ class DbalPublisherModule implements AnnotationModule
     public function canHandle($extensionObject): bool
     {
         return
-            $extensionObject instanceof RegisterDbalPublisher
+            $extensionObject instanceof DbalMessagePublisherConfiguration
             || $extensionObject instanceof ApplicationConfiguration;
     }
 

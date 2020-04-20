@@ -6,7 +6,7 @@ namespace Test\Ecotone\Dbal\Configuration;
 
 use Doctrine\Common\Annotations\AnnotationException;
 use Ecotone\Dbal\Configuration\DbalPublisherModule;
-use Ecotone\Dbal\Configuration\RegisterDbalPublisher;
+use Ecotone\Dbal\Configuration\DbalMessagePublisherConfiguration;
 use Ecotone\Dbal\DbalOutboundChannelAdapterBuilder;
 use Ecotone\Messaging\Config\Annotation\InMemoryAnnotationRegistrationService;
 use Ecotone\Messaging\Config\ApplicationConfiguration;
@@ -22,8 +22,8 @@ use Ecotone\Messaging\Handler\Gateway\ParameterToMessageConverter\GatewayHeaders
 use Ecotone\Messaging\Handler\Gateway\ParameterToMessageConverter\GatewayHeaderValueBuilder;
 use Ecotone\Messaging\Handler\Gateway\ParameterToMessageConverter\GatewayPayloadBuilder;
 use Ecotone\Messaging\MessageHeaders;
+use Ecotone\Messaging\MessagePublisher;
 use Ecotone\Messaging\MessagingException;
-use Ecotone\Messaging\Publisher;
 use Ecotone\Messaging\Support\InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use ReflectionException;
@@ -35,14 +35,14 @@ class DbalPublisherModuleTest extends TestCase
         $this->assertEquals(
             $this->createMessagingSystemConfiguration()
                 ->registerGatewayBuilder(
-                    GatewayProxyBuilder::create(Publisher::class, Publisher::class, "send", Publisher::class)
+                    GatewayProxyBuilder::create(MessagePublisher::class, MessagePublisher::class, "send", MessagePublisher::class)
                         ->withParameterConverters([
                             GatewayPayloadBuilder::create("data"),
                             GatewayHeaderBuilder::create("sourceMediaType", MessageHeaders::CONTENT_TYPE)
                         ])
                 )
                 ->registerGatewayBuilder(
-                    GatewayProxyBuilder::create(Publisher::class, Publisher::class, "sendWithMetadata", Publisher::class)
+                    GatewayProxyBuilder::create(MessagePublisher::class, MessagePublisher::class, "sendWithMetadata", MessagePublisher::class)
                         ->withParameterConverters([
                             GatewayPayloadBuilder::create("data"),
                             GatewayHeadersBuilder::create("metadata"),
@@ -50,14 +50,14 @@ class DbalPublisherModuleTest extends TestCase
                         ])
                 )
                 ->registerGatewayBuilder(
-                    GatewayProxyBuilder::create(Publisher::class, Publisher::class, "convertAndSend", Publisher::class)
+                    GatewayProxyBuilder::create(MessagePublisher::class, MessagePublisher::class, "convertAndSend", MessagePublisher::class)
                         ->withParameterConverters([
                             GatewayPayloadBuilder::create("data"),
                             GatewayHeaderValueBuilder::create(MessageHeaders::CONTENT_TYPE, MediaType::APPLICATION_X_PHP)
                         ])
                 )
                 ->registerGatewayBuilder(
-                    GatewayProxyBuilder::create(Publisher::class, Publisher::class, "convertAndSendWithMetadata", Publisher::class)
+                    GatewayProxyBuilder::create(MessagePublisher::class, MessagePublisher::class, "convertAndSendWithMetadata", MessagePublisher::class)
                         ->withParameterConverters([
                             GatewayPayloadBuilder::create("data"),
                             GatewayHeadersBuilder::create("metadata"),
@@ -66,15 +66,15 @@ class DbalPublisherModuleTest extends TestCase
                 )
                 ->registerMessageHandler(
                     DbalOutboundChannelAdapterBuilder::create("queueName", "connection")
-                        ->withEndpointId(Publisher::class . ".handler")
-                        ->withInputChannelName(Publisher::class)
+                        ->withEndpointId(MessagePublisher::class . ".handler")
+                        ->withInputChannelName(MessagePublisher::class)
                         ->withAutoDeclareOnSend(false)
                         ->withHeaderMapper("ecotone.*")
                         ->withDefaultConversionMediaType(MediaType::APPLICATION_JSON)
                 ),
             $this->prepareConfiguration(
                 [
-                    RegisterDbalPublisher::create(Publisher::class, "queueName", MediaType::APPLICATION_JSON, "connection")
+                    DbalMessagePublisherConfiguration::create(MessagePublisher::class, "queueName", MediaType::APPLICATION_JSON, "connection")
                         ->withAutoDeclareQueueOnSend(false)
                         ->withHeaderMapper("ecotone.*")
                 ]
@@ -126,14 +126,14 @@ class DbalPublisherModuleTest extends TestCase
         $this->assertEquals(
             $this->createMessagingSystemConfiguration()
                 ->registerGatewayBuilder(
-                    GatewayProxyBuilder::create(Publisher::class, Publisher::class, "send", Publisher::class)
+                    GatewayProxyBuilder::create(MessagePublisher::class, MessagePublisher::class, "send", MessagePublisher::class)
                         ->withParameterConverters([
                             GatewayPayloadBuilder::create("data"),
                             GatewayHeaderBuilder::create("sourceMediaType", MessageHeaders::CONTENT_TYPE)
                         ])
                 )
                 ->registerGatewayBuilder(
-                    GatewayProxyBuilder::create(Publisher::class, Publisher::class, "sendWithMetadata", Publisher::class)
+                    GatewayProxyBuilder::create(MessagePublisher::class, MessagePublisher::class, "sendWithMetadata", MessagePublisher::class)
                         ->withParameterConverters([
                             GatewayPayloadBuilder::create("data"),
                             GatewayHeadersBuilder::create("metadata"),
@@ -141,14 +141,14 @@ class DbalPublisherModuleTest extends TestCase
                         ])
                 )
                 ->registerGatewayBuilder(
-                    GatewayProxyBuilder::create(Publisher::class, Publisher::class, "convertAndSend", Publisher::class)
+                    GatewayProxyBuilder::create(MessagePublisher::class, MessagePublisher::class, "convertAndSend", MessagePublisher::class)
                         ->withParameterConverters([
                             GatewayPayloadBuilder::create("data"),
                             GatewayHeaderValueBuilder::create(MessageHeaders::CONTENT_TYPE, MediaType::APPLICATION_X_PHP)
                         ])
                 )
                 ->registerGatewayBuilder(
-                    GatewayProxyBuilder::create(Publisher::class, Publisher::class, "convertAndSendWithMetadata", Publisher::class)
+                    GatewayProxyBuilder::create(MessagePublisher::class, MessagePublisher::class, "convertAndSendWithMetadata", MessagePublisher::class)
                         ->withParameterConverters([
                             GatewayPayloadBuilder::create("data"),
                             GatewayHeadersBuilder::create("metadata"),
@@ -157,15 +157,15 @@ class DbalPublisherModuleTest extends TestCase
                 )
                 ->registerMessageHandler(
                     DbalOutboundChannelAdapterBuilder::create("queueName", "connection")
-                        ->withEndpointId(Publisher::class . ".handler")
-                        ->withInputChannelName(Publisher::class)
+                        ->withEndpointId(MessagePublisher::class . ".handler")
+                        ->withInputChannelName(MessagePublisher::class)
                         ->withAutoDeclareOnSend(true)
                         ->withHeaderMapper("")
                         ->withDefaultConversionMediaType(MediaType::APPLICATION_JSON)
                 ),
             $this->prepareConfiguration(
                 [
-                    RegisterDbalPublisher::create(Publisher::class, "queueName", MediaType::APPLICATION_JSON, "connection"),
+                    DbalMessagePublisherConfiguration::create(MessagePublisher::class, "queueName", MediaType::APPLICATION_JSON, "connection"),
                     ApplicationConfiguration::createWithDefaults()
                         ->withDefaultSerializationMediaType(MediaType::APPLICATION_JSON)
                 ]
@@ -179,8 +179,8 @@ class DbalPublisherModuleTest extends TestCase
 
         $this->prepareConfiguration(
             [
-                RegisterDbalPublisher::create("test", Publisher::class, MediaType::APPLICATION_JSON, "connection"),
-                RegisterDbalPublisher::create("test", Publisher::class, MediaType::APPLICATION_JSON, "connection")
+                DbalMessagePublisherConfiguration::create("test", MessagePublisher::class, MediaType::APPLICATION_JSON, "connection"),
+                DbalMessagePublisherConfiguration::create("test", MessagePublisher::class, MediaType::APPLICATION_JSON, "connection")
             ]
         );
     }

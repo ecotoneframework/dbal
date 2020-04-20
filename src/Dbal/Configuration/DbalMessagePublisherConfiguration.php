@@ -7,7 +7,7 @@ namespace Ecotone\Dbal\Configuration;
 use Ecotone\Dbal\DbalOutboundChannelAdapterBuilder;
 use Enqueue\Dbal\DbalConnectionFactory;
 
-class RegisterDbalPublisher
+class DbalMessagePublisherConfiguration
 {
     /**
      * @var string
@@ -65,9 +65,9 @@ class RegisterDbalPublisher
 
     /**
      * @param bool $autoDeclareQueueOnSend
-     * @return RegisterDbalPublisher
+     * @return DbalMessagePublisherConfiguration
      */
-    public function withAutoDeclareQueueOnSend(bool $autoDeclareQueueOnSend): RegisterDbalPublisher
+    public function withAutoDeclareQueueOnSend(bool $autoDeclareQueueOnSend): DbalMessagePublisherConfiguration
     {
         $this->autoDeclareQueueOnSend = $autoDeclareQueueOnSend;
 
@@ -78,9 +78,9 @@ class RegisterDbalPublisher
      * @param string $headerMapper comma separated list of headers to be mapped.
      *                             (e.g. "\*" or "thing1*, thing2" or "*thing1")
      *
-     * @return RegisterDbalPublisher
+     * @return DbalMessagePublisherConfiguration
      */
-    public function withHeaderMapper(string $headerMapper) : RegisterDbalPublisher
+    public function withHeaderMapper(string $headerMapper) : DbalMessagePublisherConfiguration
     {
         $this->headerMapper = $headerMapper;
 

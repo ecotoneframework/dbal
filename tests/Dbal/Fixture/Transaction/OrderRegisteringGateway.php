@@ -1,10 +1,9 @@
 <?php
 
-
 namespace Test\Ecotone\Dbal\Fixture\Transaction;
 
-use Ecotone\Messaging\Annotation\Gateway;
 use Ecotone\Messaging\Annotation\MessageEndpoint;
+use Ecotone\Messaging\Annotation\MessageGateway;
 
 /**
  * @MessageEndpoint()
@@ -12,7 +11,7 @@ use Ecotone\Messaging\Annotation\MessageEndpoint;
 interface OrderRegisteringGateway
 {
     /**
-     * @Gateway(requestChannel="placeOrder")
+     * @MessageGateway(requestChannel="placeOrder")
      */
     public function place(string $order): void;
 }
