@@ -15,7 +15,7 @@ use Ecotone\Messaging\MessageChannel;
 use Enqueue\Dbal\DbalConnectionFactory;
 use Ramsey\Uuid\Uuid;
 
-class DbalBackedMessageChannelBuilder implements EnqueueMessageChannelBuilder
+class DbalBackedMessageChannelBuilder extends EnqueueMessageChannelBuilder
 {
     /**
      * @var DbalInboundChannelAdapterBuilder
@@ -111,10 +111,7 @@ class DbalBackedMessageChannelBuilder implements EnqueueMessageChannelBuilder
         return array_merge($this->inboundChannelAdapter->getRequiredReferences(), $this->outboundChannelAdapter->getRequiredReferenceNames());
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function build(ReferenceSearchService $referenceSearchService): MessageChannel
+    public function prepareProviderChannel(ReferenceSearchService $referenceSearchService, PollingMetadata $pollingMetadata): MessageChannel
     {
         $inMemoryChannelResolver = InMemoryChannelResolver::createEmpty();
         return new DbalBackedMessageChannel(
