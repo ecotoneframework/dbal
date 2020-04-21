@@ -48,7 +48,7 @@ class DbalTransactionConfiguration implements AnnotationModule
         $pointcut = "@(" . DbalTransaction::class . ")";
         foreach ($extensionObjects as $extensionObject) {
             if ($extensionObject instanceof DbalConfiguration) {
-                if ($extensionObject->isDefaultTransactionOnPollableEndpoints()) {
+                if ($extensionObject->isDefaultTransactionOnAsynchronousEndpoints()) {
                     $pointcut .= "||@(" . PollableEndpoint::class . ")";
                 }
                 if ($extensionObject->isDefaultTransactionOnCommandBus()) {

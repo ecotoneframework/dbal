@@ -6,10 +6,10 @@ use Enqueue\Dbal\DbalConnectionFactory;
 
 class DbalConfiguration
 {
-    const DEFAULT_TRANSACTION_ON_POLLABLE_ENDPOINTS = false;
+    const DEFAULT_TRANSACTION_ON_ASYNCHRONOUS_ENDPOINTS = false;
     const DEFAULT_TRANSACTION_ON_COMMAND_BUS = false;
 
-    private $defaultTransactionOnPollableEndpoints = self::DEFAULT_TRANSACTION_ON_POLLABLE_ENDPOINTS;
+    private $defaultTransactionOnAsynchronousEndpoints = self::DEFAULT_TRANSACTION_ON_ASYNCHRONOUS_ENDPOINTS;
 
     private $defaultTransactionOnCommandBus = self::DEFAULT_TRANSACTION_ON_COMMAND_BUS;
 
@@ -27,15 +27,15 @@ class DbalConfiguration
         return new self();
     }
 
-    public function withDefaultTransactionOnPollabeEndpoints(bool $isTransactionEnabled) : self
+    public function withTransactionOnAsynchronousEndpoints(bool $isTransactionEnabled) : self
     {
         $self = clone $this;
-        $self->defaultTransactionOnPollableEndpoints = $isTransactionEnabled;
+        $self->defaultTransactionOnAsynchronousEndpoints = $isTransactionEnabled;
 
         return $self;
     }
 
-    public function withDefaultTransactionOnCommandBus(bool $isTransactionEnabled) : self
+    public function withTransactionOnCommandBus(bool $isTransactionEnabled) : self
     {
         $self = clone $this;
         $self->defaultTransactionOnCommandBus = $isTransactionEnabled;
@@ -54,9 +54,9 @@ class DbalConfiguration
     /**
      * @return bool
      */
-    public function isDefaultTransactionOnPollableEndpoints(): bool
+    public function isDefaultTransactionOnAsynchronousEndpoints(): bool
     {
-        return $this->defaultTransactionOnPollableEndpoints;
+        return $this->defaultTransactionOnAsynchronousEndpoints;
     }
 
     /**

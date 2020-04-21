@@ -28,8 +28,8 @@ class ChannelConfiguration
             DbalBackedMessageChannelBuilder::create("placeOrder", "managerRegistry")
                 ->withReceiveTimeout(1),
             DbalConfiguration::createWithDefaults()
-                ->withDefaultTransactionOnPollabeEndpoints(true)
-                ->withDefaultTransactionOnCommandBus(true)
+                ->withTransactionOnAsynchronousEndpoints(true)
+                ->withTransactionOnCommandBus(true)
                 ->withDefaultConnectionReferenceNames(["managerRegistry"])
         ];
     }
