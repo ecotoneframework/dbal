@@ -72,7 +72,7 @@ class DbalInboundChannelAdapterBuilder extends EnqueueInboundChannelAdapterBuild
             true,
             $this->queueName,
             $this->receiveTimeoutInMilliseconds,
-            new InboundMessageConverter($this->acknowledgeMode, DbalHeader::HEADER_ACKNOWLEDGE, $this->headerMapper)
+            new InboundMessageConverter($this->getEndpointId(), $this->acknowledgeMode, DbalHeader::HEADER_ACKNOWLEDGE, $this->headerMapper)
         );
         return $inboundChannelAdapter;
     }

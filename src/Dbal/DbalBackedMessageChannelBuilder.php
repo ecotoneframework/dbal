@@ -5,7 +5,6 @@ namespace Ecotone\Dbal;
 
 
 use Ecotone\Enqueue\EnqueueMessageChannelBuilder;
-use Ecotone\Messaging\Channel\MessageChannelBuilder;
 use Ecotone\Messaging\Config\InMemoryChannelResolver;
 use Ecotone\Messaging\Conversion\MediaType;
 use Ecotone\Messaging\Endpoint\PollingMetadata;
@@ -13,7 +12,6 @@ use Ecotone\Messaging\Handler\InterfaceToCallRegistry;
 use Ecotone\Messaging\Handler\ReferenceSearchService;
 use Ecotone\Messaging\MessageChannel;
 use Enqueue\Dbal\DbalConnectionFactory;
-use Ramsey\Uuid\Uuid;
 
 class DbalBackedMessageChannelBuilder extends EnqueueMessageChannelBuilder
 {
@@ -29,7 +27,7 @@ class DbalBackedMessageChannelBuilder extends EnqueueMessageChannelBuilder
     private function __construct(string $channelName, string $connectionReferenceName)
     {
         $this->inboundChannelAdapter = DbalInboundChannelAdapterBuilder::createWith(
-            Uuid::uuid4()->toString(),
+            $channelName,
             $channelName,
             null,
             $connectionReferenceName
