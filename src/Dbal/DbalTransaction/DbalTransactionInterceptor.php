@@ -45,6 +45,10 @@ class DbalTransactionInterceptor
         }, $DbalTransaction ? $DbalTransaction->connectionReferenceNames : $this->connectionReferenceNames);
 
         foreach ($connections as $connection) {
+            if ($connection->isTransactionActive()) {
+                return $methodInvocation->proceed();
+            }
+
             $connection->beginTransaction();
         }
         try {

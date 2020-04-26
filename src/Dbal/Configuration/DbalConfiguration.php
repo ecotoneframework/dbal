@@ -8,10 +8,13 @@ class DbalConfiguration
 {
     const DEFAULT_TRANSACTION_ON_ASYNCHRONOUS_ENDPOINTS = false;
     const DEFAULT_TRANSACTION_ON_COMMAND_BUS = false;
+    const DEFAULT_DEDUPLICATION_ENABLED = false;
 
     private $defaultTransactionOnAsynchronousEndpoints = self::DEFAULT_TRANSACTION_ON_ASYNCHRONOUS_ENDPOINTS;
 
     private $defaultTransactionOnCommandBus = self::DEFAULT_TRANSACTION_ON_COMMAND_BUS;
+
+    private $deduplicatedEnabled = self::DEFAULT_DEDUPLICATION_ENABLED;
 
     /**
      * @var array
@@ -49,6 +52,19 @@ class DbalConfiguration
         $self->defaultConnectionReferenceNames = $connectionReferenceNames;
 
         return $self;
+    }
+
+    public function withDeduplication(bool $isDeduplicatedEnabled) : self
+    {
+        $self = clone $this;
+        $self->deduplicatedEnabled = $isDeduplicatedEnabled;
+
+        return $self;
+    }
+
+    public function isDeduplicatedEnabled(): bool
+    {
+        return $this->deduplicatedEnabled;
     }
 
     /**

@@ -51,7 +51,7 @@ class DbalOutboundChannelAdapterBuilder extends EnqueueOutboundChannelAdapterBui
             CachedConnectionFactory::createFor(new DbalReconnectableConnectionFactory($dbalConnectionFactory)),
             $this->queueName,
             $this->autoDeclare,
-            new OutboundMessageConverter($this->headerMapper, $conversionService, $this->defaultConversionMediaType, $this->defaultDeliveryDelay, $this->defaultTimeToLive)
+            new OutboundMessageConverter($this->headerMapper, $conversionService, $this->defaultConversionMediaType, $this->defaultDeliveryDelay, $this->defaultTimeToLive, $this->defaultPriority)
         );
     }
 }

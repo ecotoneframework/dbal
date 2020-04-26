@@ -1,6 +1,6 @@
 <?php
 
-namespace Ecotone\Dbal\DbalTransaction;
+namespace Ecotone\Dbal\Deduplication;
 
 use Ecotone\Dbal\Configuration\DbalConfiguration;
 use Ecotone\Messaging\Annotation\ModuleAnnotation;
@@ -8,17 +8,16 @@ use Ecotone\Messaging\Annotation\PollableEndpoint;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
 use Ecotone\Messaging\Config\Annotation\AnnotationRegistrationService;
 use Ecotone\Messaging\Config\Configuration;
+use Ecotone\Messaging\Config\ConfigurationException;
 use Ecotone\Messaging\Config\ModuleReferenceSearchService;
 use Ecotone\Messaging\Handler\Processor\MethodInvoker\AroundInterceptorReference;
 use Ecotone\Messaging\Precedence;
 use Ecotone\Modelling\CommandBus;
-use Ecotone\Modelling\LazyEventBus\LazyEventBusInterceptor;
-use Enqueue\Dbal\DbalConnectionFactory;
 
 /**
  * @ModuleAnnotation()
  */
-class DbalTransactionConfiguration implements AnnotationModule
+class DeduplicationConfiguration implements AnnotationModule
 {
     private function __construct()
     {
@@ -37,7 +36,7 @@ class DbalTransactionConfiguration implements AnnotationModule
      */
     public function getName(): string
     {
-        return "DbalTransactionModule";
+        return "DbalDeduplicationModule";
     }
 
     /**
@@ -45,30 +44,29 @@ class DbalTransactionConfiguration implements AnnotationModule
      */
     public function prepare(Configuration $configuration, array $extensionObjects, ModuleReferenceSearchService $moduleReferenceSearchService): void
     {
-        $connectionFactories = [DbalConnectionFactory::class];
-        $pointcut = "@(" . DbalTransaction::class . ")";
+        $connectionFactory = [];
         foreach ($extensionObjects as $extensionObject) {
             if ($extensionObject instanceof DbalConfiguration) {
-                if ($extensionObject->isDefaultTransactionOnAsynchronousEndpoints()) {
-                    $pointcut .= "||@(" . PollableEndpoint::class . ")";
-                }
-                if ($extensionObject->isDefaultTransactionOnCommandBus()) {
-                    $pointcut .= "||" . CommandBus::class . "";
-                }
-                if ($extensionObject->getDefaultConnectionReferenceNames()) {
-                    $connectionFactories = $extensionObject->getDefaultConnectionReferenceNames();
+                $connectionFactory = $extensionObject->getDefaultConnectionReferenceNames();
+
+                if (!$extensionObject->isDeduplicatedEnabled()) {
+                    return;
                 }
             }
+        }
+
+        if (count($connectionFactory) !== 1) {
+            throw ConfigurationException::create("For using duplication only one connection factory can be defined got: " . implode($connectionFactory));
         }
 
         $configuration
             ->registerAroundMethodInterceptor(
                 AroundInterceptorReference::createWithObjectBuilder(
-                    DbalTransactionInterceptor::class,
-                    new DbalTransactionInterceptorBuilder($connectionFactories),
-                    "transactional",
-                    Precedence::DATABASE_TRANSACTION_PRECEDENCE,
-                    $pointcut
+                    DeduplicationInterceptor::class,
+                    new DeduplicationInterceptorBuilder($connectionFactory[0]),
+                    "deduplicate",
+                    Precedence::DATABASE_TRANSACTION_PRECEDENCE + 100,
+                    "@(" . PollableEndpoint::class . ")||@(" . CommandBus::class . ")"
                 )
             );
     }

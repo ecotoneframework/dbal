@@ -73,14 +73,6 @@ class DbalBackedMessageChannelBuilder extends EnqueueMessageChannelBuilder
         return $this;
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function isPollable(): bool
-    {
-        return true;
-    }
-
     public function withDefaultConversionMediaType(string $mediaType): self
     {
         $this->outboundChannelAdapter->withDefaultConversionMediaType($mediaType);
