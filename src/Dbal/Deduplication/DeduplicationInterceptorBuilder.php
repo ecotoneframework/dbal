@@ -7,6 +7,7 @@ use Ecotone\Enqueue\CachedConnectionFactory;
 use Ecotone\Messaging\Handler\ChannelResolver;
 use Ecotone\Messaging\Handler\Processor\MethodInvoker\AroundInterceptorObjectBuilder;
 use Ecotone\Messaging\Handler\ReferenceSearchService;
+use Ecotone\Messaging\Scheduling\EpochBasedClock;
 
 class DeduplicationInterceptorBuilder implements AroundInterceptorObjectBuilder
 {
@@ -14,10 +15,15 @@ class DeduplicationInterceptorBuilder implements AroundInterceptorObjectBuilder
      * @var string
      */
     private $connectionReferenceName;
+    /**
+     * @var int
+     */
+    private $minimumTimeToRemoveMessageInMilliseconds;
 
-    public function __construct(string $connectionReferenceName)
+    public function __construct(string $connectionReferenceName, int $minimumTimeToRemoveMessageInMilliseconds)
     {
         $this->connectionReferenceName = $connectionReferenceName;
+        $this->minimumTimeToRemoveMessageInMilliseconds = $minimumTimeToRemoveMessageInMilliseconds;
     }
 
     /**
@@ -31,7 +37,9 @@ class DeduplicationInterceptorBuilder implements AroundInterceptorObjectBuilder
     public function build(ChannelResolver $channelResolver, ReferenceSearchService $referenceSearchService): object
     {
         return new DeduplicationInterceptor(
-            CachedConnectionFactory::createFor(new DbalReconnectableConnectionFactory($referenceSearchService->get($this->connectionReferenceName)))
+            CachedConnectionFactory::createFor(new DbalReconnectableConnectionFactory($referenceSearchService->get($this->connectionReferenceName))),
+            new EpochBasedClock(),
+            $this->minimumTimeToRemoveMessageInMilliseconds
         );
     }
 

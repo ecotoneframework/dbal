@@ -12,13 +12,14 @@ use Ecotone\Messaging\Config\ConfigurationException;
 use Ecotone\Messaging\Config\ModuleReferenceSearchService;
 use Ecotone\Messaging\Handler\Processor\MethodInvoker\AroundInterceptorReference;
 use Ecotone\Messaging\Precedence;
-use Ecotone\Modelling\CommandBus;
 
 /**
  * @ModuleAnnotation()
  */
 class DeduplicationConfiguration implements AnnotationModule
 {
+    const REMOVE_MESSAGE_AFTER_7_DAYS = 1000 * 60 * 60 * 24 * 7;
+
     private function __construct()
     {
     }
@@ -63,10 +64,10 @@ class DeduplicationConfiguration implements AnnotationModule
             ->registerAroundMethodInterceptor(
                 AroundInterceptorReference::createWithObjectBuilder(
                     DeduplicationInterceptor::class,
-                    new DeduplicationInterceptorBuilder($connectionFactory[0]),
+                    new DeduplicationInterceptorBuilder($connectionFactory[0], self::REMOVE_MESSAGE_AFTER_7_DAYS),
                     "deduplicate",
                     Precedence::DATABASE_TRANSACTION_PRECEDENCE + 100,
-                    "@(" . PollableEndpoint::class . ")||@(" . CommandBus::class . ")"
+                    "@(" . PollableEndpoint::class . ")"
                 )
             );
     }
