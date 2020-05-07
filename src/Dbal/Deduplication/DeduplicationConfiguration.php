@@ -13,6 +13,7 @@ use Ecotone\Messaging\Config\ConfigurationException;
 use Ecotone\Messaging\Config\ModuleReferenceSearchService;
 use Ecotone\Messaging\Handler\Processor\MethodInvoker\AroundInterceptorReference;
 use Ecotone\Messaging\Precedence;
+use Enqueue\Dbal\DbalConnectionFactory;
 
 /**
  * @ModuleAnnotation()
@@ -55,6 +56,10 @@ class DeduplicationConfiguration implements AnnotationModule
                     return;
                 }
             }
+        }
+
+        if (empty($connectionFactory)) {
+            $connectionFactory = [DbalConnectionFactory::class];
         }
 
         if (count($connectionFactory) !== 1) {
