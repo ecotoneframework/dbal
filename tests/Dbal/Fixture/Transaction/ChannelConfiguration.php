@@ -27,6 +27,10 @@ class ChannelConfiguration
         return [
             DbalBackedMessageChannelBuilder::create("placeOrder", "managerRegistry")
                 ->withReceiveTimeout(1),
+            PollingMetadata::create("placeOrderEndpoint")
+                ->setHandledMessageLimit(1)
+                ->setExecutionTimeLimitInMilliseconds(1)
+                ->setErrorChannelName("errorChannel"),
             DbalConfiguration::createWithDefaults()
                 ->withTransactionOnAsynchronousEndpoints(true)
                 ->withTransactionOnCommandBus(true)

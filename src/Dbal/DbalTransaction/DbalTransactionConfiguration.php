@@ -3,6 +3,7 @@
 namespace Ecotone\Dbal\DbalTransaction;
 
 use Ecotone\Dbal\Configuration\DbalConfiguration;
+use Ecotone\Messaging\Annotation\AsynchronousRunningEndpoint;
 use Ecotone\Messaging\Annotation\ModuleAnnotation;
 use Ecotone\Messaging\Annotation\PollableEndpoint;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
@@ -50,7 +51,7 @@ class DbalTransactionConfiguration implements AnnotationModule
         foreach ($extensionObjects as $extensionObject) {
             if ($extensionObject instanceof DbalConfiguration) {
                 if ($extensionObject->isDefaultTransactionOnAsynchronousEndpoints()) {
-                    $pointcut .= "||@(" . PollableEndpoint::class . ")";
+                    $pointcut .= "||@(" . AsynchronousRunningEndpoint::class . ")";
                 }
                 if ($extensionObject->isDefaultTransactionOnCommandBus()) {
                     $pointcut .= "||" . CommandBus::class . "";

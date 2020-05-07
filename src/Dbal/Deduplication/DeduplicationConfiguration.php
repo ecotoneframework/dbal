@@ -3,6 +3,7 @@
 namespace Ecotone\Dbal\Deduplication;
 
 use Ecotone\Dbal\Configuration\DbalConfiguration;
+use Ecotone\Messaging\Annotation\AsynchronousRunningEndpoint;
 use Ecotone\Messaging\Annotation\ModuleAnnotation;
 use Ecotone\Messaging\Annotation\PollableEndpoint;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
@@ -67,7 +68,7 @@ class DeduplicationConfiguration implements AnnotationModule
                     new DeduplicationInterceptorBuilder($connectionFactory[0], self::REMOVE_MESSAGE_AFTER_7_DAYS),
                     "deduplicate",
                     Precedence::DATABASE_TRANSACTION_PRECEDENCE + 100,
-                    "@(" . PollableEndpoint::class . ")"
+                    "@(" . AsynchronousRunningEndpoint::class . ")"
                 )
             );
     }

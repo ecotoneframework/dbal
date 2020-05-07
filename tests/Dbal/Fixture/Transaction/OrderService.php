@@ -31,11 +31,7 @@ class OrderService
     }
 
     /**
-     * @ServiceActivator(
-     *     endpointId="placeOrderEndpoint",
-     *     inputChannelName="placeOrder",
-     *     poller=@Poller(handledMessageLimit=1, executionTimeLimitInMilliseconds=1, errorChannelName="errorChannel")
-     * )
+     * @ServiceActivator(endpointId="placeOrderEndpoint", inputChannelName="placeOrder")
      */
     public function throwExceptionOnReceive(string $order): void
     {
