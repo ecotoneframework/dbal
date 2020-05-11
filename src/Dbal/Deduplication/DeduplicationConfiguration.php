@@ -47,17 +47,19 @@ class DeduplicationConfiguration implements AnnotationModule
      */
     public function prepare(Configuration $configuration, array $extensionObjects, ModuleReferenceSearchService $moduleReferenceSearchService): void
     {
+        $isDeduplicatedEnabled = false;
         $connectionFactory = [];
         foreach ($extensionObjects as $extensionObject) {
             if ($extensionObject instanceof DbalConfiguration) {
                 $connectionFactory = $extensionObject->getDefaultConnectionReferenceNames();
-
-                if (!$extensionObject->isDeduplicatedEnabled()) {
-                    return;
-                }
+                $isDeduplicatedEnabled = $extensionObject->isDeduplicatedEnabled();
             }
         }
 
+        if (!$isDeduplicatedEnabled) {
+            return;
+        }
+        
         if (empty($connectionFactory)) {
             $connectionFactory = [DbalConnectionFactory::class];
         }
