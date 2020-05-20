@@ -59,7 +59,7 @@ class DeduplicationConfiguration implements AnnotationModule
         if (!$isDeduplicatedEnabled) {
             return;
         }
-        
+
         if (empty($connectionFactory)) {
             $connectionFactory = [DbalConnectionFactory::class];
         }
