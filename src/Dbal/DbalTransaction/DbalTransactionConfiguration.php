@@ -63,6 +63,7 @@ class DbalTransactionConfiguration implements AnnotationModule
         }
 
         $configuration
+            ->requireReferences($connectionFactories)
             ->registerAroundMethodInterceptor(
                 AroundInterceptorReference::createWithObjectBuilder(
                     DbalTransactionInterceptor::class,
