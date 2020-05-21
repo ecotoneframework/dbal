@@ -35,7 +35,7 @@ class DbalTransactionInterceptor
     public function transactional(MethodInvocation $methodInvocation, ?DbalTransaction $DbalTransaction)
     {;
         /** @var Connection[] $connections */
-        $connections = array_map(function(string $connectionReferenceName){
+        $possibleConnections = array_map(function(string $connectionReferenceName){
             $connectionFactory = CachedConnectionFactory::createFor(new DbalReconnectableConnectionFactory($this->referenceSearchService->get($connectionReferenceName)));
 
             /** @var DbalContext $context */
@@ -44,11 +44,16 @@ class DbalTransactionInterceptor
             return  $context->getDbalConnection();
         }, $DbalTransaction ? $DbalTransaction->connectionReferenceNames : $this->connectionReferenceNames);
 
-        foreach ($connections as $connection) {
+        $connections = [];
+        foreach ($possibleConnections as $connection) {
             if ($connection->isTransactionActive()) {
-                return $methodInvocation->proceed();
+                continue;
             }
 
+            $connections[] = $connection;
+        }
+
+        foreach ($connections as $connection) {
             $connection->beginTransaction();
         }
         try {

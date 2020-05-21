@@ -81,6 +81,7 @@ class DbalTransactionInterceptorTest extends DbalMessagingTest
 
         $this->assertEquals(1, $methodInvocation->getCalledTimes());
 
+        usleep(2000);
         $dbalTransactionInterceptor->deduplicate($methodInvocation, [], [
             MessageHeaders::MESSAGE_ID => 1,
             MessageHeaders::CONSUMER_ENDPOINT_ID => "endpoint1"
