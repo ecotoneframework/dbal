@@ -6,8 +6,8 @@ use Enqueue\Dbal\DbalConnectionFactory;
 
 class DbalConfiguration
 {
-    const DEFAULT_TRANSACTION_ON_ASYNCHRONOUS_ENDPOINTS = false;
-    const DEFAULT_TRANSACTION_ON_COMMAND_BUS = false;
+    const DEFAULT_TRANSACTION_ON_ASYNCHRONOUS_ENDPOINTS = true;
+    const DEFAULT_TRANSACTION_ON_COMMAND_BUS = true;
     const DEFAULT_DEDUPLICATION_ENABLED = false;
 
     private $defaultTransactionOnAsynchronousEndpoints = self::DEFAULT_TRANSACTION_ON_ASYNCHRONOUS_ENDPOINTS;
