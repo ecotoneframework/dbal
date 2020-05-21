@@ -64,9 +64,7 @@ class DbalTransactionInterceptor
             }
         }catch (\Throwable $exception) {
             foreach ($connections as $connection) {
-                if ($connection->isConnected()) {
-                    $connection->rollBack();
-                }
+                try { $connection->rollBack(); }catch (\Throwable $failureRollBack) {}
             }
 
             throw $exception;

@@ -4,9 +4,12 @@
 namespace Ecotone\Dbal;
 
 
+use Doctrine\DBAL\Connection;
+use Doctrine\Persistence\ManagerRegistry;
 use Ecotone\Enqueue\ReconnectableConnectionFactory;
 use Enqueue\Dbal\DbalConnectionFactory;
 use Enqueue\Dbal\DbalContext;
+use Enqueue\Dbal\ManagerRegistryConnectionFactory;
 use Interop\Queue\ConnectionFactory;
 use Interop\Queue\Context;
 use ReflectionClass;
@@ -43,15 +46,30 @@ class DbalReconnectableConnectionFactory implements ReconnectableConnectionFacto
             return false;
         }
 
-        return !$context->getDbalConnection()->isConnected();
+        return !$context->getDbalConnection()->isConnected()  || !$context->getDbalConnection()->ping();
     }
 
     public function reconnect(): void
     {
         $reflectionClass = new ReflectionClass($this->connectionFactory);
+        if ($this->connectionFactory instanceof ManagerRegistryConnectionFactory) {
+            $registry = $reflectionClass->getProperty("registry");
+            $registry->setAccessible(true);
+            $config = $reflectionClass->getProperty("config");
+            $config->setAccessible(true);
 
-        $connectionProperty = $reflectionClass->getProperty("connection");
-        $connectionProperty->setAccessible(true);
-        $connectionProperty->setValue($this->connectionFactory, null);
+            $connectionName = $config->getValue($this->connectionFactory)["connection_name"];
+            /** @var ManagerRegistry $registry */
+            $registry = $registry->getValue($this->connectionFactory);
+            /** @var Connection $connection */
+            $connection = $registry->getConnection($connectionName);
+
+            $connection->close();
+            $connection->connect();
+        }else {
+            $connectionProperty = $reflectionClass->getProperty("connection");
+            $connectionProperty->setAccessible(true);
+            $connectionProperty->setValue($this->connectionFactory, null);
+        }
     }
 }
