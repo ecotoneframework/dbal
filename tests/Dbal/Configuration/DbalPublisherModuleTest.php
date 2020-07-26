@@ -5,10 +5,10 @@ namespace Test\Ecotone\Dbal\Configuration;
 
 
 use Doctrine\Common\Annotations\AnnotationException;
+use Ecotone\AnnotationFinder\InMemory\InMemoryAnnotationFinder;
 use Ecotone\Dbal\Configuration\DbalPublisherModule;
 use Ecotone\Dbal\Configuration\DbalMessagePublisherConfiguration;
 use Ecotone\Dbal\DbalOutboundChannelAdapterBuilder;
-use Ecotone\Messaging\Config\Annotation\InMemoryAnnotationRegistrationService;
 use Ecotone\Messaging\Config\ApplicationConfiguration;
 use Ecotone\Messaging\Config\Configuration;
 use Ecotone\Messaging\Config\ConfigurationException;
@@ -107,7 +107,7 @@ class DbalPublisherModuleTest extends TestCase
      */
     private function prepareConfiguration(array $extensions): MessagingSystemConfiguration
     {
-        $cqrsMessagingModule = DbalPublisherModule::create(InMemoryAnnotationRegistrationService::createEmpty());
+        $cqrsMessagingModule = DbalPublisherModule::create(InMemoryAnnotationFinder::createEmpty());
 
         $extendedConfiguration = $this->createMessagingSystemConfiguration();
         $moduleReferenceSearchService = ModuleReferenceSearchService::createEmpty();

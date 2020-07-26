@@ -2,6 +2,7 @@
 
 namespace Ecotone\Dbal\DbalTransaction;
 
+use Ecotone\AnnotationFinder\AnnotationFinder;
 use Ecotone\Dbal\Configuration\DbalConfiguration;
 use Ecotone\Messaging\Annotation\AsynchronousRunningEndpoint;
 use Ecotone\Messaging\Annotation\ModuleAnnotation;
@@ -13,7 +14,6 @@ use Ecotone\Messaging\Config\ModuleReferenceSearchService;
 use Ecotone\Messaging\Handler\Processor\MethodInvoker\AroundInterceptorReference;
 use Ecotone\Messaging\Precedence;
 use Ecotone\Modelling\CommandBus;
-use Ecotone\Modelling\LazyEventBus\LazyEventBusInterceptor;
 use Enqueue\Dbal\DbalConnectionFactory;
 
 /**
@@ -28,7 +28,7 @@ class DbalTransactionConfiguration implements AnnotationModule
     /**
      * @inheritDoc
      */
-    public static function create(AnnotationRegistrationService $annotationRegistrationService)
+    public static function create(AnnotationFinder $annotationRegistrationService)
     {
         return new self();
     }
@@ -47,7 +47,7 @@ class DbalTransactionConfiguration implements AnnotationModule
     public function prepare(Configuration $configuration, array $extensionObjects, ModuleReferenceSearchService $moduleReferenceSearchService): void
     {
         $connectionFactories = [DbalConnectionFactory::class];
-        $pointcut = "@(" . DbalTransaction::class . ")";
+        $pointcut            = "@(" . DbalTransaction::class . ")";
         foreach ($extensionObjects as $extensionObject) {
             if ($extensionObject instanceof DbalConfiguration) {
                 if ($extensionObject->isDefaultTransactionOnAsynchronousEndpoints()) {

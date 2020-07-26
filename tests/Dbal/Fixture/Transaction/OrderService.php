@@ -3,19 +3,12 @@
 
 namespace Test\Ecotone\Dbal\Fixture\Transaction;
 
-use Ecotone\Messaging\Annotation\MessageEndpoint;
 use Ecotone\Messaging\Annotation\Poller;
 use Ecotone\Messaging\Annotation\ServiceActivator;
 use Ecotone\Messaging\MessagingException;
 use Ecotone\Modelling\Annotation\CommandHandler;
 use InvalidArgumentException;
 
-/**
- * Class OrderService
- * @package Test\Ecotone\Amqp\Fixture\Order
- * @author Dariusz Gafka <dgafka.mail@gmail.com>
- * @MessageEndpoint()
- */
 class OrderService
 {
     /**

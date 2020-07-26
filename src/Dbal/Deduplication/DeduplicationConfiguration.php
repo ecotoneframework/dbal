@@ -2,6 +2,7 @@
 
 namespace Ecotone\Dbal\Deduplication;
 
+use Ecotone\AnnotationFinder\AnnotationFinder;
 use Ecotone\Dbal\Configuration\DbalConfiguration;
 use Ecotone\Messaging\Annotation\AsynchronousRunningEndpoint;
 use Ecotone\Messaging\Annotation\ModuleAnnotation;
@@ -29,7 +30,7 @@ class DeduplicationConfiguration implements AnnotationModule
     /**
      * @inheritDoc
      */
-    public static function create(AnnotationRegistrationService $annotationRegistrationService)
+    public static function create(AnnotationFinder $annotationRegistrationService)
     {
         return new self();
     }
@@ -48,10 +49,10 @@ class DeduplicationConfiguration implements AnnotationModule
     public function prepare(Configuration $configuration, array $extensionObjects, ModuleReferenceSearchService $moduleReferenceSearchService): void
     {
         $isDeduplicatedEnabled = false;
-        $connectionFactory = [];
+        $connectionFactory     = [];
         foreach ($extensionObjects as $extensionObject) {
             if ($extensionObject instanceof DbalConfiguration) {
-                $connectionFactory = $extensionObject->getDefaultConnectionReferenceNames();
+                $connectionFactory     = $extensionObject->getDefaultConnectionReferenceNames();
                 $isDeduplicatedEnabled = $extensionObject->isDeduplicatedEnabled();
             }
         }
