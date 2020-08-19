@@ -19,3 +19,7 @@ services:
     environment:
       POSTGRES_USER: "ecotone"
       POSTGRES_PASSWORD: "secret"
+networks:
+  default:
+    external:
+      name: ecotone-test

@@ -10,6 +10,7 @@ use Ecotone\Enqueue\OutboundMessageConverter;
 use Ecotone\Messaging\Conversion\ConversionService;
 use Ecotone\Messaging\Handler\ChannelResolver;
 use Ecotone\Messaging\Handler\ReferenceSearchService;
+use Ecotone\Messaging\MessageConverter\DefaultHeaderMapper;
 use Ecotone\Messaging\MessageHandler;
 use Enqueue\Dbal\DbalConnectionFactory;
 use Interop\Queue\ConnectionFactory;
@@ -47,11 +48,12 @@ class DbalOutboundChannelAdapterBuilder extends EnqueueOutboundChannelAdapterBui
         /** @var ConversionService $conversionService */
         $conversionService = $referenceSearchService->get(ConversionService::REFERENCE_NAME);
 
+        $headerMapper = DefaultHeaderMapper::createWith([], $this->headerMapper, $conversionService);
         return new DbalOutboundChannelAdapter(
             CachedConnectionFactory::createFor(new DbalReconnectableConnectionFactory($dbalConnectionFactory)),
             $this->queueName,
             $this->autoDeclare,
-            new OutboundMessageConverter($this->headerMapper, $conversionService, $this->defaultConversionMediaType, $this->defaultDeliveryDelay, $this->defaultTimeToLive, $this->defaultPriority)
+            new OutboundMessageConverter($headerMapper, $conversionService, $this->defaultConversionMediaType, $this->defaultDeliveryDelay, $this->defaultTimeToLive, $this->defaultPriority)
         );
     }
 }

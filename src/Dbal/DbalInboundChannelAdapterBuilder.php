@@ -6,11 +6,13 @@ namespace Ecotone\Dbal;
 use Ecotone\Enqueue\CachedConnectionFactory;
 use Ecotone\Enqueue\EnqueueInboundChannelAdapterBuilder;
 use Ecotone\Enqueue\InboundMessageConverter;
+use Ecotone\Messaging\Conversion\ConversionService;
 use Ecotone\Messaging\Endpoint\ConsumerLifecycle;
 use Ecotone\Messaging\Endpoint\PollingMetadata;
 use Ecotone\Messaging\Endpoint\TaskExecutorChannelAdapter\TaskExecutorChannelAdapter;
 use Ecotone\Messaging\Handler\ChannelResolver;
 use Ecotone\Messaging\Handler\ReferenceSearchService;
+use Ecotone\Messaging\MessageConverter\DefaultHeaderMapper;
 use Enqueue\Dbal\DbalConnectionFactory;
 use Exception;
 
@@ -65,14 +67,17 @@ class DbalInboundChannelAdapterBuilder extends EnqueueInboundChannelAdapterBuild
     {
         /** @var DbalConnectionFactory $connectionFactory */
         $connectionFactory = $referenceSearchService->get($this->connectionReferenceName);
+        /** @var ConversionService $conversionService */
+        $conversionService = $referenceSearchService->get(ConversionService::REFERENCE_NAME);
 
+        $headerMapper = DefaultHeaderMapper::createWith($this->headerMapper, [], $conversionService);
         $inboundChannelAdapter = new DbalInboundChannelAdapter(
             CachedConnectionFactory::createFor(new DbalReconnectableConnectionFactory($connectionFactory)),
             $this->buildGatewayFor($referenceSearchService, $channelResolver, $pollingMetadata),
             true,
             $this->queueName,
             $this->receiveTimeoutInMilliseconds,
-            new InboundMessageConverter($this->getEndpointId(), $this->acknowledgeMode, DbalHeader::HEADER_ACKNOWLEDGE, $this->headerMapper)
+            new InboundMessageConverter($this->getEndpointId(), $this->acknowledgeMode, DbalHeader::HEADER_ACKNOWLEDGE, $headerMapper)
         );
         return $inboundChannelAdapter;
     }
