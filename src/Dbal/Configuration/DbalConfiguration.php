@@ -88,7 +88,7 @@ class DbalConfiguration
     {
         $self = clone $this;
         $self->deduplicatedEnabled = $isDeduplicatedEnabled;
-        $this->deduplicationConnectionReference = $connectionReference;
+        $self->deduplicationConnectionReference = $connectionReference;
 
         return $self;
     }
@@ -97,7 +97,7 @@ class DbalConfiguration
     {
         $self = clone $this;
         $self->deadLetterEnabled = $isDeadLetterEnabled;
-        $this->deadLetterConnectionReference = $connectionReference;
+        $self->deadLetterConnectionReference = $connectionReference;
 
         return $self;
     }
