@@ -1,10 +1,11 @@
-<?php
+<?php declare(strict_types=1);
 
 
 namespace Ecotone\Dbal;
 
 
 use Ecotone\Enqueue\CachedConnectionFactory;
+use Ecotone\Enqueue\OutboundMessage;
 use Ecotone\Enqueue\OutboundMessageConverter;
 use Ecotone\Messaging\Message;
 use Ecotone\Messaging\MessageHandler;
@@ -12,6 +13,7 @@ use Ecotone\Messaging\MessageHeaders;
 use Enqueue\Dbal\DbalContext;
 use Enqueue\Dbal\DbalDestination;
 use Enqueue\Dbal\DbalMessage;
+use Exception;
 
 class DbalOutboundChannelAdapter implements MessageHandler
 {
@@ -38,10 +40,10 @@ class DbalOutboundChannelAdapter implements MessageHandler
 
     public function __construct(CachedConnectionFactory $connectionFactory, string $queueName, bool $autoDeclare, OutboundMessageConverter $outboundMessageConverter)
     {
-        $this->connectionFactory = $connectionFactory;
-        $this->autoDeclare = $autoDeclare;
+        $this->connectionFactory        = $connectionFactory;
+        $this->autoDeclare              = $autoDeclare;
         $this->outboundMessageConverter = $outboundMessageConverter;
-        $this->queueName = $queueName;
+        $this->queueName                = $queueName;
     }
 
     /**
@@ -58,15 +60,24 @@ class DbalOutboundChannelAdapter implements MessageHandler
             $this->initialized = true;
         }
 
-        $outboundMessage = $this->outboundMessageConverter->prepare($message);
-        $headers = $outboundMessage->getHeaders();
+        $outboundMessage                       = $this->outboundMessageConverter->prepare($message);
+        $headers                               = $outboundMessage->getHeaders();
         $headers[MessageHeaders::CONTENT_TYPE] = $outboundMessage->getContentType();
 
         $messageToSend = new DbalMessage($outboundMessage->getPayload(), $headers, []);
 
-        $this->connectionFactory->getProducer()
-            ->setTimeToLive($outboundMessage->getTimeToLive())
-            ->setDeliveryDelay($outboundMessage->getDeliveryDelay())
-            ->send(new DbalDestination($this->queueName), $messageToSend);
+        try {
+            $this->connectionFactory->getProducer()
+                ->setTimeToLive($outboundMessage->getTimeToLive())
+                ->setDeliveryDelay($this->roundToExpectedSeconds($outboundMessage))
+                ->send(new DbalDestination($this->queueName), $messageToSend);
+        } catch (Exception $exception) {
+            throw $exception->getPrevious() ? $exception->getPrevious() : $exception;
+        }
+    }
+
+    private function roundToExpectedSeconds(OutboundMessage $outboundMessage): int
+    {
+        return (int)round($outboundMessage->getDeliveryDelay() / 1000);
     }
 }

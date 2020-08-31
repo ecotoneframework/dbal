@@ -4,3 +4,16 @@ Feature: activating as aggregate order entity
     Given I active messaging for namespace "Test\Ecotone\Dbal\Fixture\Transaction"
     When I transactionally order "milk"
     When I active receiver "placeOrderEndpoint"
+
+  Scenario: Application exception handling
+    Given I active messaging for namespace "Test\Ecotone\Dbal\Fixture\DeadLetter"
+    When I order "coffee"
+    And I call pollable endpoint "orderService"
+    Then there should be 0 orders
+    And I call pollable endpoint "orderService"
+    Then there should be 0 orders
+    And there should 1 error message in dead letter
+    When all error messages are replied
+    Then there should 0 error message in dead letter
+    When I call pollable endpoint "orderService"
+    And there should be 1 orders

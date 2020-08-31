@@ -2,8 +2,10 @@
 
 namespace Test\Ecotone\Dbal\Behat\Bootstrap;
 
+use Behat\Behat\Tester\Exception\PendingException;
 use Behat\Behat\Context\Context;
 use Doctrine\Common\Annotations\AnnotationException;
+use Ecotone\Dbal\Recoverability\DeadLetterGateway;
 use Ecotone\Lite\EcotoneLiteConfiguration;
 use Ecotone\Lite\InMemoryPSRContainer;
 use Ecotone\Messaging\Config\ApplicationConfiguration;
@@ -20,6 +22,7 @@ use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 use ReflectionException;
 use Test\Ecotone\Dbal\DbalConnectionManagerRegistryWrapper;
+use Test\Ecotone\Dbal\Fixture\DeadLetter\OrderGateway;
 use Test\Ecotone\Dbal\Fixture\Transaction\OrderService;
 use Test\Ecotone\Modelling\Fixture\OrderAggregate\OrderErrorHandler;
 
@@ -48,6 +51,12 @@ class DomainContext extends TestCase implements Context
             case "Test\Ecotone\Dbal\Fixture\Transaction": {
                 $objects = [
                     new OrderService()
+                ];
+                break;
+            }
+            case "Test\Ecotone\Dbal\Fixture\DeadLetter": {
+                $objects = [
+                    new \Test\Ecotone\Dbal\Fixture\DeadLetter\OrderService()
                 ];
                 break;
             }
@@ -106,5 +115,63 @@ class DomainContext extends TestCase implements Context
         try {
             $commandBus->convertAndSend("order.register", MediaType::APPLICATION_X_PHP, $order);
         }catch (\InvalidArgumentException $e) {}
+    }
+
+    /**
+     * @When I order :order
+     */
+    public function iOrder(string $order)
+    {
+        /** @var OrderGateway $gateway */
+        $gateway = self::$messagingSystem->getGatewayByName(OrderGateway::class);
+
+        $gateway->order($order);
+    }
+
+    /**
+     * @When I call pollable endpoint :consumerId
+     */
+    public function iCallPollableEndpoint(string $consumerId)
+    {
+        self::$messagingSystem->runSeparatelyRunningEndpointBy($consumerId);
+    }
+
+    /**
+     * @Then there should be :amount orders
+     */
+    public function thereShouldBeOrders(int $amount)
+    {
+        /** @var OrderGateway $gateway */
+        $gateway = self::$messagingSystem->getGatewayByName(OrderGateway::class);
+
+        $this->assertEquals(
+            $amount,
+            $gateway->getOrderAmount()
+        );
+    }
+
+    /**
+     * @Then there should :amount error message in dead letter
+     */
+    public function thereShouldErrorMessageInDeadLetter(int $amount)
+    {
+        /** @var DeadLetterGateway $gateway */
+        $gateway = self::$messagingSystem->getGatewayByName(DeadLetterGateway::class);
+
+        $this->assertEquals(
+            $amount,
+            count($gateway->list(100,0))
+        );
+    }
+
+    /**
+     * @When all error messages are replied
+     */
+    public function whenAllErrorMessagesAreReplied()
+    {
+        /** @var DeadLetterGateway $gateway */
+        $gateway = self::$messagingSystem->getGatewayByName(DeadLetterGateway::class);
+
+        $gateway->replyAll();
     }
 }

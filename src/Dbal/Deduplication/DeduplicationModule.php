@@ -6,9 +6,7 @@ use Ecotone\AnnotationFinder\AnnotationFinder;
 use Ecotone\Dbal\Configuration\DbalConfiguration;
 use Ecotone\Messaging\Annotation\AsynchronousRunningEndpoint;
 use Ecotone\Messaging\Annotation\ModuleAnnotation;
-use Ecotone\Messaging\Annotation\PollableEndpoint;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
-use Ecotone\Messaging\Config\Annotation\AnnotationRegistrationService;
 use Ecotone\Messaging\Config\Configuration;
 use Ecotone\Messaging\Config\ConfigurationException;
 use Ecotone\Messaging\Config\ModuleReferenceSearchService;
@@ -19,7 +17,7 @@ use Enqueue\Dbal\DbalConnectionFactory;
 /**
  * @ModuleAnnotation()
  */
-class DeduplicationConfiguration implements AnnotationModule
+class DeduplicationModule implements AnnotationModule
 {
     const REMOVE_MESSAGE_AFTER_7_DAYS = 1000 * 60 * 60 * 24 * 7;
 
@@ -49,10 +47,10 @@ class DeduplicationConfiguration implements AnnotationModule
     public function prepare(Configuration $configuration, array $extensionObjects, ModuleReferenceSearchService $moduleReferenceSearchService): void
     {
         $isDeduplicatedEnabled = false;
-        $connectionFactory     = [];
+        $connectionFactory     = DbalConnectionFactory::class;
         foreach ($extensionObjects as $extensionObject) {
             if ($extensionObject instanceof DbalConfiguration) {
-                $connectionFactory     = $extensionObject->getDefaultConnectionReferenceNames();
+                $connectionFactory     = $extensionObject->getDeduplicationConnectionReference();
                 $isDeduplicatedEnabled = $extensionObject->isDeduplicatedEnabled();
             }
         }
@@ -61,19 +59,11 @@ class DeduplicationConfiguration implements AnnotationModule
             return;
         }
 
-        if (empty($connectionFactory)) {
-            $connectionFactory = [DbalConnectionFactory::class];
-        }
-
-        if (count($connectionFactory) !== 1) {
-            throw ConfigurationException::create("For using duplication only one connection factory can be defined got: " . implode($connectionFactory));
-        }
-
         $configuration
             ->registerAroundMethodInterceptor(
                 AroundInterceptorReference::createWithObjectBuilder(
                     DeduplicationInterceptor::class,
-                    new DeduplicationInterceptorBuilder($connectionFactory[0], self::REMOVE_MESSAGE_AFTER_7_DAYS),
+                    new DeduplicationInterceptorBuilder($connectionFactory, self::REMOVE_MESSAGE_AFTER_7_DAYS),
                     "deduplicate",
                     Precedence::DATABASE_TRANSACTION_PRECEDENCE + 100,
                     "@(" . AsynchronousRunningEndpoint::class . ")"

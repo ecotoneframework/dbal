@@ -2,6 +2,7 @@
 
 namespace Ecotone\Dbal\Configuration;
 
+use Ecotone\Messaging\Config\ConfigurationException;
 use Enqueue\Dbal\DbalConnectionFactory;
 
 class DbalConfiguration
@@ -10,16 +11,16 @@ class DbalConfiguration
     const DEFAULT_TRANSACTION_ON_COMMAND_BUS = true;
     const DEFAULT_DEDUPLICATION_ENABLED = false;
 
-    private $defaultTransactionOnAsynchronousEndpoints = self::DEFAULT_TRANSACTION_ON_ASYNCHRONOUS_ENDPOINTS;
+    private bool $defaultTransactionOnAsynchronousEndpoints = self::DEFAULT_TRANSACTION_ON_ASYNCHRONOUS_ENDPOINTS;
 
-    private $defaultTransactionOnCommandBus = self::DEFAULT_TRANSACTION_ON_COMMAND_BUS;
+    private bool $defaultTransactionOnCommandBus = self::DEFAULT_TRANSACTION_ON_COMMAND_BUS;
 
-    private $deduplicatedEnabled = self::DEFAULT_DEDUPLICATION_ENABLED;
+    private array $defaultConnectionReferenceNames = [DbalConnectionFactory::class];
 
-    /**
-     * @var array
-     */
-    private $defaultConnectionReferenceNames = [];
+    private bool $deduplicatedEnabled = self::DEFAULT_DEDUPLICATION_ENABLED;
+
+    private ?string $deduplicationConnectionReference = null;
+    private ?string $deadLetterConnectionReference = null;
 
     private function __construct()
     {
@@ -28,6 +29,33 @@ class DbalConfiguration
     public static function createWithDefaults() : self
     {
         return new self();
+    }
+
+    public function getDeduplicationConnectionReference(): string
+    {
+        return $this->getMainConnectionOrDefault($this->deduplicationConnectionReference, "deduplication");
+    }
+
+    public function getDeadLetterConnectionReference(): string
+    {
+        return $this->getMainConnectionOrDefault($this->deadLetterConnectionReference, "dead letter");
+    }
+
+    private function getMainConnectionOrDefault(?string $connectionReferenceName, string $type) : string
+    {
+        if ($connectionReferenceName) {
+            return $connectionReferenceName;
+        }
+
+        if (empty($this->defaultConnectionReferenceNames)) {
+            return DbalConnectionFactory::class;
+        }
+
+        if (count($this->defaultConnectionReferenceNames) !== 1) {
+            throw ConfigurationException::create("Specify exact connection for {$type}. Got: " . implode(",", $this->defaultConnectionReferenceNames));
+        }
+
+        return $this->defaultConnectionReferenceNames[0];
     }
 
     public function withTransactionOnAsynchronousEndpoints(bool $isTransactionEnabled) : self

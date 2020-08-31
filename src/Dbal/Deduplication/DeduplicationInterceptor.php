@@ -79,8 +79,8 @@ class DeduplicationInterceptor
         $this->getConnection()->createQueryBuilder()
             ->delete($this->getTableName())
             ->andWhere('(:now - handled_at) >= :minimumTimeToRemoveTheMessage')
-            ->setParameter(':now', $this->clock->unixTimeInMilliseconds(), Type::BIGINT)
-            ->setParameter(':minimumTimeToRemoveTheMessage', $this->minimumTimeToRemoveMessageInMilliseconds, Type::BIGINT)
+            ->setParameter(':now', $this->clock->unixTimeInMilliseconds(), Types::BIGINT)
+            ->setParameter(':minimumTimeToRemoveTheMessage', $this->minimumTimeToRemoveMessageInMilliseconds, Types::BIGINT)
             ->execute();
     }
 
@@ -107,7 +107,7 @@ class DeduplicationInterceptor
 
     private function getTableName(): string
     {
-        return "ecotoneoutbox";
+        return "ecotone_outbox";
     }
 
     private function createDataBaseTable(): void
