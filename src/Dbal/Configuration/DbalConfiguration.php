@@ -84,18 +84,20 @@ class DbalConfiguration
         return $self;
     }
 
-    public function withDeduplication(bool $isDeduplicatedEnabled) : self
+    public function withDeduplication(bool $isDeduplicatedEnabled, string $connectionReference = DbalConnectionFactory::class) : self
     {
         $self = clone $this;
         $self->deduplicatedEnabled = $isDeduplicatedEnabled;
+        $this->deduplicationConnectionReference = $connectionReference;
 
         return $self;
     }
 
-    public function withDeadLetter(bool $isDeadLetterEnabled) : self
+    public function withDeadLetter(bool $isDeadLetterEnabled, string $connectionReference = DbalConnectionFactory::class) : self
     {
         $self = clone $this;
         $self->deadLetterEnabled = $isDeadLetterEnabled;
+        $this->deadLetterConnectionReference = $connectionReference;
 
         return $self;
     }
