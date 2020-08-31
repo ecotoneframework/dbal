@@ -13,10 +13,7 @@ class DbalDeadLetterOneTimeCommand
 {
     const PAGE_LIMIT = 20;
 
-    /**
-     * @OneTimeCommand("ecotone:dbal:deadletter:list")
-     */
-    public function listMessages(DeadLetterGateway $deadLetterGateway, int $page = 0) : OneTimeCommandResultSet
+    public function list(DeadLetterGateway $deadLetterGateway, int $page = 0) : OneTimeCommandResultSet
     {
         $limit = self::PAGE_LIMIT;
         $offset = $page * self::PAGE_LIMIT;
@@ -33,10 +30,7 @@ class DbalDeadLetterOneTimeCommand
         );
     }
 
-    /**
-     * @OneTimeCommand("ecotone:dbal:deadletter:show")
-     */
-    public function getMessageDetails(DeadLetterGateway $deadLetterGateway, string $messageId, bool $fullDetails = false) : OneTimeCommandResultSet
+    public function show(DeadLetterGateway $deadLetterGateway, string $messageId, bool $fullDetails = false) : OneTimeCommandResultSet
     {
         $message = $deadLetterGateway->getDetails($messageId);
 
@@ -52,25 +46,16 @@ class DbalDeadLetterOneTimeCommand
         );
     }
 
-    /**
-     * @OneTimeCommand("ecotone:dbal:deadletter:reply")
-     */
     public function reply(DeadLetterGateway $deadLetterGateway, string $messageId) : void
     {
         $deadLetterGateway->reply($messageId);
     }
 
-    /**
-     * @OneTimeCommand("ecotone:dbal:deadletter:delete")
-     */
     public function delete(DeadLetterGateway $deadLetterGateway, string $messageId) : void
     {
         $deadLetterGateway->delete($messageId);
     }
 
-    /**
-     * @OneTimeCommand("ecotone:dbal:deadletter:replyAll")
-     */
     public function replyAll(DeadLetterGateway $deadLetterGateway) : void
     {
         $deadLetterGateway->replyAll();

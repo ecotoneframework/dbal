@@ -62,6 +62,7 @@ class ErrorConfigurationContext
     public function dbalConfiguration()
     {
         return DbalConfiguration::createWithDefaults()
+            ->withDeadLetter(true)
             ->withDefaultConnectionReferenceNames(["managerRegistry"]);
     }
 }

@@ -10,6 +10,7 @@ class DbalConfiguration
     const DEFAULT_TRANSACTION_ON_ASYNCHRONOUS_ENDPOINTS = true;
     const DEFAULT_TRANSACTION_ON_COMMAND_BUS = true;
     const DEFAULT_DEDUPLICATION_ENABLED = false;
+    const DEFAULT_DEAD_LETTER_ENABLED = false;
 
     private bool $defaultTransactionOnAsynchronousEndpoints = self::DEFAULT_TRANSACTION_ON_ASYNCHRONOUS_ENDPOINTS;
 
@@ -18,6 +19,7 @@ class DbalConfiguration
     private array $defaultConnectionReferenceNames = [DbalConnectionFactory::class];
 
     private bool $deduplicatedEnabled = self::DEFAULT_DEDUPLICATION_ENABLED;
+    private bool $deadLetterEnabled = self::DEFAULT_DEAD_LETTER_ENABLED;
 
     private ?string $deduplicationConnectionReference = null;
     private ?string $deadLetterConnectionReference = null;
@@ -90,9 +92,22 @@ class DbalConfiguration
         return $self;
     }
 
+    public function withDeadLetter(bool $isDeadLetterEnabled) : self
+    {
+        $self = clone $this;
+        $self->deadLetterEnabled = $isDeadLetterEnabled;
+
+        return $self;
+    }
+
     public function isDeduplicatedEnabled(): bool
     {
         return $this->deduplicatedEnabled;
+    }
+
+    public function isDeadLetterEnabled(): bool
+    {
+        return $this->deadLetterEnabled;
     }
 
     /**
