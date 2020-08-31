@@ -23,8 +23,8 @@ class DbalDeadLetterOneTimeCommand
             array_map(function(ErrorContext $errorContext) {
                 return [
                     $errorContext->getMessageId(),
-                    $this->convertTimestampToReadableFormat($errorContext->getFailedTimestamp(), false),
-                    $this->getReadableStacktrace($errorContext->getStackTrace())
+                    $this->convertTimestampToReadableFormat($errorContext->getFailedTimestamp()),
+                    $this->getReadableStacktrace($errorContext->getStackTrace(), false)
                 ];
             }, $deadLetterGateway->list($limit, $offset))
         );
