@@ -50,8 +50,12 @@ class DeduplicationModule implements AnnotationModule
         $connectionFactory     = DbalConnectionFactory::class;
         foreach ($extensionObjects as $extensionObject) {
             if ($extensionObject instanceof DbalConfiguration) {
+                if (!$extensionObject->isDeduplicatedEnabled()) {
+                    return;
+                }
+
                 $connectionFactory     = $extensionObject->getDeduplicationConnectionReference();
-                $isDeduplicatedEnabled = $extensionObject->isDeduplicatedEnabled();
+                $isDeduplicatedEnabled = true;
             }
         }
 
