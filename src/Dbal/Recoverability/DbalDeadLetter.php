@@ -50,7 +50,7 @@ class DbalDeadLetter
         }, $messages);
     }
 
-    public function show(string $messageId): Message
+    public function show(string $messageId, ?string $replyChannel = null): Message
     {
         $this->initialize();
         $message = $this->getConnection()->createQueryBuilder()
@@ -73,26 +73,14 @@ class DbalDeadLetter
 
         return MessageBuilder::withPayload($message['payload'])
                     ->setMultipleHeaders($headers)
+                    ->setHeader(MessageHeaders::REPLY_CHANNEL, $replyChannel)
                     ->build();
     }
 
     public function reply(string $messageId, MessagingEntrypoint $messagingEntrypoint): void
     {
         $this->initialize();
-        $message = $this->show($messageId);
-        $message = MessageBuilder::fromMessageWithPreservedMessageId($message)
-                            ->removeHeaders([
-                                ErrorContext::EXCEPTION_STACKTRACE,
-                                ErrorContext::EXCEPTION_CODE,
-                                ErrorContext::EXCEPTION_MESSAGE,
-                                ErrorContext::EXCEPTION_FILE,
-                                ErrorContext::EXCEPTION_LINE
-                            ])
-                            ->setHeader(MessagingEntrypoint::ENTRYPOINT, $message->getHeaders()->get(MessageHeaders::POLLED_CHANNEL_NAME))
-                            ->build();
-
-        $messagingEntrypoint->sendMessage($message);
-        $this->delete($messageId);
+        $this->replyWithoutInitialization($messageId, $messagingEntrypoint);
     }
 
     public function replyAll(MessagingEntrypoint $messagingEntrypoint) : void
@@ -100,7 +88,7 @@ class DbalDeadLetter
         $this->initialize();
         while ($errorContexts = $this->list(100, 0)) {
             foreach ($errorContexts as $errorContext) {
-                $this->reply($errorContext->getMessageId(), $messagingEntrypoint);
+                $this->replyWithoutInitialization($errorContext->getMessageId(), $messagingEntrypoint);
             }
         }
     }
@@ -189,5 +177,25 @@ class DbalDeadLetter
             $this->createDataBaseTable();
             $this->isInitialized = true;
         }
+    }
+
+    private function replyWithoutInitialization(string $messageId, MessagingEntrypoint $messagingEntrypoint): void
+    {
+        $message = $this->show($messageId);
+        $message = MessageBuilder::fromMessageWithPreservedMessageId($message)
+            ->removeHeaders(
+                [
+                    ErrorContext::EXCEPTION_STACKTRACE,
+                    ErrorContext::EXCEPTION_CODE,
+                    ErrorContext::EXCEPTION_MESSAGE,
+                    ErrorContext::EXCEPTION_FILE,
+                    ErrorContext::EXCEPTION_LINE
+                ]
+            )
+            ->setHeader(MessagingEntrypoint::ENTRYPOINT, $message->getHeaders()->get(MessageHeaders::POLLED_CHANNEL_NAME))
+            ->build();
+
+        $messagingEntrypoint->sendMessage($message);
+        $this->delete($messageId);
     }
 }

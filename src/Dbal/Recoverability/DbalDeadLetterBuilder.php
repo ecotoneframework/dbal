@@ -13,11 +13,13 @@ use Ecotone\Messaging\Handler\InputOutputMessageHandlerBuilder;
 use Ecotone\Messaging\Handler\InterfaceToCall;
 use Ecotone\Messaging\Handler\InterfaceToCallRegistry;
 use Ecotone\Messaging\Handler\Processor\MethodInvoker\Converter\HeaderBuilder;
+use Ecotone\Messaging\Handler\Processor\MethodInvoker\Converter\PayloadBuilder;
 use Ecotone\Messaging\Handler\Processor\MethodInvoker\Converter\ReferenceBuilder;
 use Ecotone\Messaging\Handler\ReferenceSearchService;
 use Ecotone\Messaging\Handler\ServiceActivator\ServiceActivatorBuilder;
 use Ecotone\Messaging\MessageConverter\DefaultHeaderMapper;
 use Ecotone\Messaging\MessageHandler;
+use Ecotone\Messaging\MessageHeaders;
 
 class DbalDeadLetterBuilder extends InputOutputMessageHandlerBuilder
 {
@@ -55,7 +57,10 @@ class DbalDeadLetterBuilder extends InputOutputMessageHandlerBuilder
 
     public static function createShow(string $connectionReferenceName): self
     {
-        return new self("show", $connectionReferenceName, self::SHOW_CHANNEL, []);
+        return new self("show", $connectionReferenceName, self::SHOW_CHANNEL, [
+            PayloadBuilder::create("messageId"),
+            HeaderBuilder::createOptional("replyChannel", MessageHeaders::REPLY_CHANNEL)
+        ]);
     }
 
     public static function createReply(string $connectionReferenceName): self
