@@ -40,7 +40,7 @@ class DbalDeadLetterOneTimeCommand
                 ["Message Id", $message->getHeaders()->getMessageId()],
                 ["Failed At", $this->convertTimestampToReadableFormat($message->getHeaders()->getTimestamp())],
                 ["Channel Name", $message->getHeaders()->get(MessageHeaders::POLLED_CHANNEL_NAME)],
-                ["Content Type", $message->getHeaders()->containsKey(MessageHeaders::TYPE_ID) ? $message->getHeaders()->get(MessageHeaders::TYPE_ID) : "Unknown"],
+                ["Type", $message->getHeaders()->containsKey(MessageHeaders::TYPE_ID) ? $message->getHeaders()->get(MessageHeaders::TYPE_ID) : "Unknown"],
                 ["Stacktrace", $this->getReadableStacktrace($message->getHeaders()->get(ErrorContext::EXCEPTION_STACKTRACE), $fullDetails)]
             ]
         );
