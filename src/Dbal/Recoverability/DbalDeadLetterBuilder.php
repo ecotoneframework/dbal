@@ -113,7 +113,7 @@ class DbalDeadLetterBuilder extends InputOutputMessageHandlerBuilder
     {
         return [
             $interfaceToCallRegistry->getFor(DbalDeadLetter::class, "list"),
-            $interfaceToCallRegistry->getFor(DbalDeadLetter::class, "getDetails"),
+            $interfaceToCallRegistry->getFor(DbalDeadLetter::class, "show"),
             $interfaceToCallRegistry->getFor(DbalDeadLetter::class, "reply"),
             $interfaceToCallRegistry->getFor(DbalDeadLetter::class, "replyAll"),
             $interfaceToCallRegistry->getFor(DbalDeadLetter::class, "delete"),

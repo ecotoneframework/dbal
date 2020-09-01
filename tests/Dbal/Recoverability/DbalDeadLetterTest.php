@@ -36,7 +36,7 @@ class DbalDeadLetterTest extends DbalMessagingTest
 
         $this->assertEquals(
             $errorMessage,
-            $dbalDeadLetter->getDetails($errorMessage->getHeaders()->getMessageId())
+            $dbalDeadLetter->show($errorMessage->getHeaders()->getMessageId())
         );
     }
 

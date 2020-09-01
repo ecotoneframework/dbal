@@ -79,7 +79,7 @@ class DbalDeadLetter
     public function reply(string $messageId, MessagingEntrypoint $messagingEntrypoint): void
     {
         $this->initialize();
-        $message = $this->getDetails($messageId);
+        $message = $this->show($messageId);
         $message = MessageBuilder::fromMessageWithPreservedMessageId($message)
                             ->removeHeaders([
                                 ErrorContext::EXCEPTION_STACKTRACE,
