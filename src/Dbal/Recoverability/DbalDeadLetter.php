@@ -10,6 +10,7 @@ use Doctrine\DBAL\Types\Types;
 use Ecotone\Messaging\Gateway\MessagingEntrypoint;
 use Ecotone\Messaging\Handler\Recoverability\ErrorContext;
 use Ecotone\Messaging\Message;
+use Ecotone\Messaging\MessageChannel;
 use Ecotone\Messaging\MessageConverter\HeaderMapper;
 use Ecotone\Messaging\MessageHeaders;
 use Ecotone\Messaging\Support\InvalidArgumentException;
@@ -50,7 +51,7 @@ class DbalDeadLetter
         }, $messages);
     }
 
-    public function show(string $messageId, ?string $replyChannel = null): Message
+    public function show(string $messageId, ?MessageChannel $replyChannel = null): Message
     {
         $this->initialize();
         $message = $this->getConnection()->createQueryBuilder()
