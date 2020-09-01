@@ -67,7 +67,7 @@ class DbalDeadLetterModule implements AnnotationModule
         $configuration
             ->registerMessageHandler(DbalDeadLetterBuilder::createStore($connectionFactory))
             ->registerMessageHandler(DbalDeadLetterBuilder::createDelete($connectionFactory))
-            ->registerMessageHandler(DbalDeadLetterBuilder::createGetDetails($connectionFactory))
+            ->registerMessageHandler(DbalDeadLetterBuilder::createShow($connectionFactory))
             ->registerMessageHandler(DbalDeadLetterBuilder::createList($connectionFactory))
             ->registerMessageHandler(DbalDeadLetterBuilder::createReply($connectionFactory))
             ->registerMessageHandler(DbalDeadLetterBuilder::createReplyAll($connectionFactory))

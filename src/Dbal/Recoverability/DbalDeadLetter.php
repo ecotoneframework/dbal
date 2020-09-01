@@ -50,7 +50,7 @@ class DbalDeadLetter
         }, $messages);
     }
 
-    public function getDetails(string $messageId): Message
+    public function show(string $messageId): Message
     {
         $this->initialize();
         $message = $this->getConnection()->createQueryBuilder()

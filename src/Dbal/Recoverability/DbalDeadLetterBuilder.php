@@ -53,9 +53,9 @@ class DbalDeadLetterBuilder extends InputOutputMessageHandlerBuilder
         );
     }
 
-    public static function createGetDetails(string $connectionReferenceName): self
+    public static function createShow(string $connectionReferenceName): self
     {
-        return new self("getDetails", $connectionReferenceName, self::SHOW_CHANNEL, []);
+        return new self("show", $connectionReferenceName, self::SHOW_CHANNEL, []);
     }
 
     public static function createReply(string $connectionReferenceName): self
