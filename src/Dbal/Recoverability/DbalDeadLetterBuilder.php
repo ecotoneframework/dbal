@@ -24,9 +24,9 @@ class DbalDeadLetterBuilder extends InputOutputMessageHandlerBuilder
     const LIMIT_HEADER  = "ecotone.dbal.deadletter.limit";
     const OFFSET_HEADER = "ecotone.dbal.deadletter.offset";
 
-    const LIST_CHANNEL      = "ecotone.dbal.deadletter.list";
-    const DETAILS_CHANNEL   = "ecotone.dbal.deadletter.details";
-    const REPLY_CHANNEL     = "ecotone.dbal.deadletter.reply";
+    const LIST_CHANNEL  = "ecotone.dbal.deadletter.list";
+    const SHOW_CHANNEL  = "ecotone.dbal.deadletter.show";
+    const REPLY_CHANNEL = "ecotone.dbal.deadletter.reply";
     const REPLY_ALL_CHANNEL = "ecotone.dbal.deadletter.replyAll";
     const DELETE_CHANNEL    = "ecotone.dbal.deadletter.delete";
     const STORE_CHANNEL     = "dbal_dead_letter";
@@ -55,7 +55,7 @@ class DbalDeadLetterBuilder extends InputOutputMessageHandlerBuilder
 
     public static function createGetDetails(string $connectionReferenceName): self
     {
-        return new self("getDetails", $connectionReferenceName, self::DETAILS_CHANNEL, []);
+        return new self("getDetails", $connectionReferenceName, self::SHOW_CHANNEL, []);
     }
 
     public static function createReply(string $connectionReferenceName): self

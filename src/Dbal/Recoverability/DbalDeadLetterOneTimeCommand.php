@@ -32,7 +32,7 @@ class DbalDeadLetterOneTimeCommand
 
     public function show(DeadLetterGateway $deadLetterGateway, string $messageId, bool $fullDetails = false) : OneTimeCommandResultSet
     {
-        $message = $deadLetterGateway->getDetails($messageId);
+        $message = $deadLetterGateway->show($messageId);
 
         return OneTimeCommandResultSet::create(
             [],

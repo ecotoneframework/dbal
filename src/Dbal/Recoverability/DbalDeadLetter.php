@@ -67,8 +67,12 @@ class DbalDeadLetter
             throw InvalidArgumentException::create("Can not find message with id {$messageId}");
         }
 
+        $headers = $this->decodeHeaders($message);
+        /** Need to be remove, otherwise it will be automatically rerouted before returned */
+        unset($headers[MessageHeaders::ROUTING_SLIP]);
+
         return MessageBuilder::withPayload($message['payload'])
-                    ->setMultipleHeaders($this->decodeHeaders($message))
+                    ->setMultipleHeaders($headers)
                     ->build();
     }
 

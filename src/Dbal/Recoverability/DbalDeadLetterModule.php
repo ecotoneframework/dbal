@@ -87,8 +87,8 @@ class DbalDeadLetterModule implements AnnotationModule
                 GatewayProxyBuilder::create(
                     DeadLetterGateway::class,
                     DeadLetterGateway::class,
-                    "getDetails",
-                    DbalDeadLetterBuilder::DETAILS_CHANNEL
+                    "show",
+                    DbalDeadLetterBuilder::SHOW_CHANNEL
                 )
             )
             ->registerGatewayBuilder(

@@ -12,7 +12,7 @@ interface DeadLetterGateway
      */
     public function list(int $limit, int $offset): array;
 
-    public function getDetails(string $messageId): Message;
+    public function show(string $messageId): Message;
 
     public function reply(string $messageId): void;
 
