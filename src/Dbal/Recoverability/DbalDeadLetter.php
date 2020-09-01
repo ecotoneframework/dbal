@@ -69,8 +69,11 @@ class DbalDeadLetter
         }
 
         $headers = $this->decodeHeaders($message);
-        /** Need to be remove, otherwise it will be automatically rerouted before returned */
-        unset($headers[MessageHeaders::ROUTING_SLIP]);
+
+        if ($replyChannel) {
+            /** Need to be remove, otherwise it will be automatically rerouted before returned */
+            unset($headers[MessageHeaders::ROUTING_SLIP]);
+        }
 
         return MessageBuilder::withPayload($message['payload'])
                     ->setMultipleHeaders($headers)
