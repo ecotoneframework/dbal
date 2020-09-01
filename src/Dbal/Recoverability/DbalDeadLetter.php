@@ -12,6 +12,7 @@ use Ecotone\Messaging\Handler\Recoverability\ErrorContext;
 use Ecotone\Messaging\Message;
 use Ecotone\Messaging\MessageConverter\HeaderMapper;
 use Ecotone\Messaging\MessageHeaders;
+use Ecotone\Messaging\Support\InvalidArgumentException;
 use Ecotone\Messaging\Support\MessageBuilder;
 use Enqueue\Dbal\DbalContext;
 use Interop\Queue\ConnectionFactory;
@@ -61,6 +62,10 @@ class DbalDeadLetter
             ->setMaxResults(1)
             ->execute()
             ->fetch();
+
+        if (!$message) {
+            throw InvalidArgumentException::create("Can not find message with id {$messageId}");
+        }
 
         return MessageBuilder::withPayload($message['payload'])
                     ->setMultipleHeaders($this->decodeHeaders($message))

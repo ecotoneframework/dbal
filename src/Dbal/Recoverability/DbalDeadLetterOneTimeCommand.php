@@ -68,6 +68,6 @@ class DbalDeadLetterOneTimeCommand
 
     private function getReadableStacktrace(string $strackTrace, bool $fullDetails): string
     {
-        return $fullDetails ? $strackTrace : substr($strackTrace, 0, 200) . "...";
+        return $fullDetails ? $strackTrace : substr($strackTrace, 0, 100) . "...";
     }
 }

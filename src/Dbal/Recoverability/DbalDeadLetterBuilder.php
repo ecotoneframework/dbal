@@ -21,15 +21,15 @@ use Ecotone\Messaging\MessageHandler;
 
 class DbalDeadLetterBuilder extends InputOutputMessageHandlerBuilder
 {
-    const LIMIT_HEADER = "ecotone.dbal.deadletter.limit";
+    const LIMIT_HEADER  = "ecotone.dbal.deadletter.limit";
     const OFFSET_HEADER = "ecotone.dbal.deadletter.offset";
 
-    const LIST_CHANNEL    = "ecotone.dbal.deadletter.list";
-    const DETAILS_CHANNEL = "ecotone.dbal.deadletter.details";
-    const REPLY_CHANNEL   = "ecotone.dbal.deadletter.reply";
-    const REPLY_ALL_CHANNEL   = "ecotone.dbal.deadletter.replyAll";
-    const DELETE_CHANNEL  = "ecotone.dbal.deadletter.delete";
-    const STORE_CHANNEL   = "dbal_dead_letter";
+    const LIST_CHANNEL      = "ecotone.dbal.deadletter.list";
+    const DETAILS_CHANNEL   = "ecotone.dbal.deadletter.details";
+    const REPLY_CHANNEL     = "ecotone.dbal.deadletter.reply";
+    const REPLY_ALL_CHANNEL = "ecotone.dbal.deadletter.replyAll";
+    const DELETE_CHANNEL    = "ecotone.dbal.deadletter.delete";
+    const STORE_CHANNEL     = "dbal_dead_letter";
 
     private string $methodName;
     private string $connectionReferenceName;
@@ -39,16 +39,18 @@ class DbalDeadLetterBuilder extends InputOutputMessageHandlerBuilder
     {
         $this->methodName              = $methodName;
         $this->connectionReferenceName = $connectionReferenceName;
-        $this->parameterConverters = $parameterConverters;
+        $this->parameterConverters     = $parameterConverters;
         $this->inputMessageChannelName = $inputChannelName;
     }
 
     public static function createList(string $connectionReferenceName): self
     {
-        return new self("list", $connectionReferenceName, self::LIST_CHANNEL, [
+        return new self(
+            "list", $connectionReferenceName, self::LIST_CHANNEL, [
             HeaderBuilder::create("limit", self::LIMIT_HEADER),
             HeaderBuilder::create("offset", self::OFFSET_HEADER)
-        ]);
+        ]
+        );
     }
 
     public static function createGetDetails(string $connectionReferenceName): self
@@ -63,9 +65,11 @@ class DbalDeadLetterBuilder extends InputOutputMessageHandlerBuilder
 
     public static function createReplyAll(string $connectionReferenceName): self
     {
-        return new self("replyAll", $connectionReferenceName, self::REPLY_ALL_CHANNEL, [
+        return new self(
+            "replyAll", $connectionReferenceName, self::REPLY_ALL_CHANNEL, [
             ReferenceBuilder::create("messagingEntrypoint", MessagingEntrypoint::class)
-        ]);
+        ]
+        );
     }
 
     public static function createDelete(string $connectionReferenceName): self
