@@ -112,12 +112,22 @@ class DbalDeadLetter
     {
         $this->initialize();
         if ($message instanceof ErrorMessage) {
-            $messageBuilder = MessageBuilder::fromMessageWithPreservedMessageId($message->getPayload()->getFailedMessage());
+//            @TODO this should be handled inside Ecotone, as it's duplicate of ErrorHandler
+
+            $messagingException = $message->getPayload();
+            $cause = $messagingException->getCause() ? $messagingException->getCause() : $messagingException;
+
+            $messageBuilder     = MessageBuilder::fromMessageWithPreservedMessageId($messagingException->getFailedMessage());
             if ($messageBuilder->containsKey(MessageHeaders::CONSUMER_ACK_HEADER_LOCATION)) {
                 $messageBuilder->removeHeader($messageBuilder->getHeaderWithName(MessageHeaders::CONSUMER_ACK_HEADER_LOCATION));
             }
 
             $message = $messageBuilder
+                ->setHeader(ErrorContext::EXCEPTION_MESSAGE, $cause->getMessage())
+                ->setHeader(ErrorContext::EXCEPTION_STACKTRACE, $cause->getTraceAsString())
+                ->setHeader(ErrorContext::EXCEPTION_FILE, $cause->getFile())
+                ->setHeader(ErrorContext::EXCEPTION_LINE, $cause->getLine())
+                ->setHeader(ErrorContext::EXCEPTION_CODE, $cause->getCode())
                 ->removeHeaders([
                     MessageHeaders::DELIVERY_DELAY,
                     MessageHeaders::TIME_TO_LIVE,
