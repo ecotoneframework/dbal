@@ -112,7 +112,19 @@ class DbalDeadLetter
     {
         $this->initialize();
         if ($message instanceof ErrorMessage) {
-            $message = $message->getPayload()->getFailedMessage();
+            $messageBuilder = MessageBuilder::fromMessageWithPreservedMessageId($message->getPayload()->getFailedMessage());
+            if ($messageBuilder->containsKey(MessageHeaders::CONSUMER_ACK_HEADER_LOCATION)) {
+                $messageBuilder->removeHeader($messageBuilder->getHeaderWithName(MessageHeaders::CONSUMER_ACK_HEADER_LOCATION));
+            }
+
+            $message = $messageBuilder
+                ->removeHeaders([
+                    MessageHeaders::DELIVERY_DELAY,
+                    MessageHeaders::TIME_TO_LIVE,
+                    MessageHeaders::CONSUMER_ACK_HEADER_LOCATION,
+                    MessageHeaders::POLLED_CHANNEL
+                ])
+                ->build();
         }
 
         $this->insertHandledMessage($message->getPayload(), $message->getHeaders()->headers());
