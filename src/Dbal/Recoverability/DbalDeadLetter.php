@@ -9,6 +9,7 @@ use Doctrine\DBAL\Types\Type;
 use Doctrine\DBAL\Types\Types;
 use Ecotone\Messaging\Gateway\MessagingEntrypoint;
 use Ecotone\Messaging\Handler\Recoverability\ErrorContext;
+use Ecotone\Messaging\Handler\Recoverability\ErrorHandler;
 use Ecotone\Messaging\Message;
 use Ecotone\Messaging\MessageChannel;
 use Ecotone\Messaging\MessageConverter\HeaderMapper;
@@ -123,6 +124,7 @@ class DbalDeadLetter
             }
 
             $message = $messageBuilder
+                ->removeHeader(ErrorHandler::ECOTONE_RETRY_HEADER)
                 ->setHeader(ErrorContext::EXCEPTION_MESSAGE, $cause->getMessage())
                 ->setHeader(ErrorContext::EXCEPTION_STACKTRACE, $cause->getTraceAsString())
                 ->setHeader(ErrorContext::EXCEPTION_FILE, $cause->getFile())
