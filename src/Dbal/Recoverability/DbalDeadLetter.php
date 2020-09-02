@@ -13,6 +13,7 @@ use Ecotone\Messaging\Message;
 use Ecotone\Messaging\MessageChannel;
 use Ecotone\Messaging\MessageConverter\HeaderMapper;
 use Ecotone\Messaging\MessageHeaders;
+use Ecotone\Messaging\Support\ErrorMessage;
 use Ecotone\Messaging\Support\InvalidArgumentException;
 use Ecotone\Messaging\Support\MessageBuilder;
 use Enqueue\Dbal\DbalContext;
@@ -110,6 +111,10 @@ class DbalDeadLetter
     public function store(Message $message): void
     {
         $this->initialize();
+        if ($message instanceof ErrorMessage) {
+            $message = $message->getPayload()->getFailedMessage();
+        }
+
         $this->insertHandledMessage($message->getPayload(), $message->getHeaders()->headers());
     }
 

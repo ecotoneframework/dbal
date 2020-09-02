@@ -4,8 +4,11 @@ namespace Test\Ecotone\Dbal\Recoverability;
 
 use Ecotone\Dbal\Recoverability\DbalDeadLetter;
 use Ecotone\Messaging\Conversion\InMemoryConversionService;
+use Ecotone\Messaging\Handler\MessageHandlingException;
 use Ecotone\Messaging\Handler\Recoverability\ErrorContext;
+use Ecotone\Messaging\Message;
 use Ecotone\Messaging\MessageConverter\DefaultHeaderMapper;
+use Ecotone\Messaging\Support\ErrorMessage;
 use Ecotone\Messaging\Support\MessageBuilder;
 use Test\Ecotone\Dbal\DbalMessagingTest;
 
@@ -38,6 +41,25 @@ class DbalDeadLetterTest extends DbalMessagingTest
             $errorMessage,
             $dbalDeadLetter->show($errorMessage->getHeaders()->getMessageId())
         );
+    }
+
+    public function test_storing_wrapped_error_message()
+    {
+        $dbalDeadLetter = new DbalDeadLetter($this->getConnectionFactory(), DefaultHeaderMapper::createAllHeadersMapping(InMemoryConversionService::createWithoutConversion()));
+
+
+        $errorMessage = MessageBuilder::withPayload("")->build();
+        $dbalDeadLetter->store($this->createFailedMessage($errorMessage));
+
+        $this->assertEquals(
+            $errorMessage,
+            $dbalDeadLetter->show($errorMessage->getHeaders()->getMessageId())
+        );
+    }
+
+    private function createFailedMessage(Message $message, \Throwable $exception = null): Message
+    {
+        return ErrorMessage::create(MessageHandlingException::fromOtherException($exception ?? new MessageHandlingException(), $message));
     }
 
     public function test_listing_error_messages()
