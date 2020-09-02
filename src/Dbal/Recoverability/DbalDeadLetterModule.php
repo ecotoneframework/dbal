@@ -20,6 +20,13 @@ use Enqueue\Dbal\DbalConnectionFactory;
  */
 class DbalDeadLetterModule implements AnnotationModule
 {
+    const LIST_COMMAND_NAME            = "ecotone:dbal:deadletter:list";
+    const SHOW_COMMAND_NAME            = "ecotone:dbal:deadletter:show";
+    const REPLY_COMMAND_NAME           = "ecotone:dbal:deadletter:reply";
+    const REPLY_ALL_COMMAND_NAME       = "ecotone:dbal:deadletter:replyAll";
+    const DELETE_COMMAND_NAME          = "ecotone:dbal:deadletter:delete";
+    const HELP_COMMAND_NAME = "ecotone:dbal:deadletter:help";
+
     /**
      * @inheritDoc
      */
@@ -58,11 +65,12 @@ class DbalDeadLetterModule implements AnnotationModule
             return;
         }
 
-        $this->registerOneTimeCommand("list", "ecotone:dbal:deadletter:list", $configuration);
-        $this->registerOneTimeCommand("show", "ecotone:dbal:deadletter:show", $configuration);
-        $this->registerOneTimeCommand("reply", "ecotone:dbal:deadletter:reply", $configuration);
-        $this->registerOneTimeCommand("replyAll", "ecotone:dbal:deadletter:replyAll", $configuration);
-        $this->registerOneTimeCommand("delete", "ecotone:dbal:deadletter:delete", $configuration);
+        $this->registerOneTimeCommand("list", self::LIST_COMMAND_NAME, $configuration);
+        $this->registerOneTimeCommand("show", self::SHOW_COMMAND_NAME, $configuration);
+        $this->registerOneTimeCommand("reply", self::REPLY_COMMAND_NAME, $configuration);
+        $this->registerOneTimeCommand("replyAll", self::REPLY_ALL_COMMAND_NAME, $configuration);
+        $this->registerOneTimeCommand("delete", self::DELETE_COMMAND_NAME, $configuration);
+        $this->registerOneTimeCommand("help", self::HELP_COMMAND_NAME, $configuration);
 
         $configuration
             ->registerMessageHandler(DbalDeadLetterBuilder::createStore($connectionFactory))
@@ -136,7 +144,7 @@ class DbalDeadLetterModule implements AnnotationModule
     private function registerOneTimeCommand(string $methodName, string $commandName, Configuration $configuration): void
     {
         list($messageHandlerBuilder, $oneTimeCommandConfiguration) = OneTimeCommandModule::prepareOneTimeCommand(
-            DbalDeadLetterOneTimeCommand::class, $methodName, $commandName
+            DbalDeadLetterConsoleCommand::class, $methodName, $commandName
         );
         $configuration
             ->registerMessageHandler($messageHandlerBuilder)

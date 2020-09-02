@@ -9,9 +9,23 @@ use Ecotone\Messaging\Config\OneTimeCommandResultSet;
 use Ecotone\Messaging\Handler\Recoverability\ErrorContext;
 use Ecotone\Messaging\MessageHeaders;
 
-class DbalDeadLetterOneTimeCommand
+class DbalDeadLetterConsoleCommand
 {
     const PAGE_LIMIT = 20;
+
+    public function help() : OneTimeCommandResultSet
+    {
+        return OneTimeCommandResultSet::create(
+            ["Command Name", "Description"],
+            [
+                [DbalDeadLetterModule::LIST_COMMAND_NAME . " {page:int}", "List all dead messages"],
+                [DbalDeadLetterModule::SHOW_COMMAND_NAME . " {messageId:string} {fullDetails:bool}", "Show more details about specific message"],
+                [DbalDeadLetterModule::REPLY_COMMAND_NAME . " {messageId:string}", "Reply chosen dead message"],
+                [DbalDeadLetterModule::REPLY_ALL_COMMAND_NAME, "Reply ALL dead message"],
+                [DbalDeadLetterModule::DELETE_COMMAND_NAME . " {messageId:string}", "Delete chosen dead message"]
+            ]
+        );
+    }
 
     public function list(DeadLetterGateway $deadLetterGateway, int $page = 0) : OneTimeCommandResultSet
     {
