@@ -54,6 +54,12 @@ class DomainContext extends TestCase implements Context
                 ];
                 break;
             }
+            case "Test\Ecotone\Dbal\Fixture\AsynchronousChannelTransaction": {
+                $objects = [
+                    new \Test\Ecotone\Dbal\Fixture\AsynchronousChannelTransaction\OrderService()
+                ];
+                break;
+            }
             case "Test\Ecotone\Dbal\Fixture\DeadLetter": {
                 $objects = [
                     new \Test\Ecotone\Dbal\Fixture\DeadLetter\OrderService()
@@ -65,9 +71,13 @@ class DomainContext extends TestCase implements Context
             }
         }
 
-        self::$messagingSystem = EcotoneLiteConfiguration::createWithConfiguration(
+        $managerRegistryConnectionFactory = new ManagerRegistryConnectionFactory(new DbalConnectionManagerRegistryWrapper(new DbalConnectionFactory(["dsn" => 'pgsql://ecotone:secret@database:5432/ecotone'])));
+        $connection = $managerRegistryConnectionFactory->createContext()->getDbalConnection();
+        $connection->executeUpdate("DELETE FROM enqueue");
+
+        self::$messagingSystem            = EcotoneLiteConfiguration::createWithConfiguration(
             __DIR__ . "/../../../../",
-            InMemoryPSRContainer::createFromObjects(array_merge($objects, ["managerRegistry" => new ManagerRegistryConnectionFactory(new DbalConnectionManagerRegistryWrapper(new DbalConnectionFactory(["dsn" => 'pgsql://ecotone:secret@database:5432/ecotone'])))])),
+            InMemoryPSRContainer::createFromObjects(array_merge($objects, ["managerRegistry" => $managerRegistryConnectionFactory])),
             ApplicationConfiguration::createWithDefaults()
                 ->withNamespaces([$namespace])
                 ->withCacheDirectoryPath(sys_get_temp_dir() . DIRECTORY_SEPARATOR . Uuid::uuid4()->toString())
@@ -173,5 +183,16 @@ class DomainContext extends TestCase implements Context
         $gateway = self::$messagingSystem->getGatewayByName(DeadLetterGateway::class);
 
         $gateway->replyAll();
+    }
+
+    /**
+     * @Then there should :amount registered orders
+     */
+    public function thereShouldRegisteredOrders($amount)
+    {
+        $this->assertEquals(
+            $amount,
+            count($this->getQueryBus()->convertAndSend("order.getRegistered", MediaType::APPLICATION_X_PHP, []))
+        );
     }
 }
