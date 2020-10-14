@@ -148,13 +148,13 @@ class DbalDeadLetter
             $this->getTableName(),
             [
                 'message_id' => $headers[MessageHeaders::MESSAGE_ID],
-                'failed_at' => $headers[MessageHeaders::TIMESTAMP],
+                'failed_at' =>  new \DateTime(date('Y-m-d H:i:s.u', $headers[MessageHeaders::TIMESTAMP])),
                 'payload' => $payload,
                 'headers' => \json_encode($this->headerMapper->mapFromMessageHeaders($headers), JSON_THROW_ON_ERROR)
             ],
             [
                 'message_id' => Types::TEXT,
-                'failed_at' => Types::BIGINT,
+                'failed_at' => Types::DATETIME_MUTABLE,
                 'payload' => Types::TEXT,
                 'headers' => Types::TEXT
             ]
@@ -181,7 +181,7 @@ class DbalDeadLetter
         $table = new Table($this->getTableName());
 
         $table->addColumn('message_id', Types::TEXT);
-        $table->addColumn('failed_at', Types::BIGINT);
+        $table->addColumn('failed_at', Types::DATETIME_MUTABLE);
         $table->addColumn('payload', Types::TEXT);
         $table->addColumn('headers', Types::TEXT);
 
