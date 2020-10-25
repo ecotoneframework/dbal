@@ -15,9 +15,7 @@ use Ecotone\Messaging\Handler\Gateway\GatewayProxyBuilder;
 use Ecotone\Messaging\Handler\Gateway\ParameterToMessageConverter\GatewayHeaderBuilder;
 use Enqueue\Dbal\DbalConnectionFactory;
 
-/**
- * @ModuleAnnotation()
- */
+#[ModuleAnnotation]
 class DbalDeadLetterModule implements AnnotationModule
 {
     const LIST_COMMAND_NAME            = "ecotone:dbal:deadletter:list";
@@ -30,7 +28,7 @@ class DbalDeadLetterModule implements AnnotationModule
     /**
      * @inheritDoc
      */
-    public static function create(AnnotationFinder $annotationRegistrationService)
+    public static function create(AnnotationFinder $annotationRegistrationService): static
     {
         return new self();
     }

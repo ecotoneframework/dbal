@@ -21,16 +21,13 @@ use Ecotone\Messaging\Handler\Gateway\ParameterToMessageConverter\GatewayPayload
 use Ecotone\Messaging\MessageHeaders;
 use Ecotone\Messaging\MessagePublisher;
 
-/**
- * @author Dariusz Gafka <dgafka.mail@gmail.com>
- * @ModuleAnnotation()
- */
+#[ModuleAnnotation]
 class DbalPublisherModule implements AnnotationModule
 {
     /**
      * @inheritDoc
      */
-    public static function create(AnnotationFinder $annotationRegistrationService)
+    public static function create(AnnotationFinder $annotationRegistrationService): static
     {
         return new self();
     }

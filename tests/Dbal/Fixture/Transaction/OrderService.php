@@ -10,11 +10,7 @@ use InvalidArgumentException;
 
 class OrderService
 {
-    /**
-     * @param string $order
-     * @param OrderRegisteringGateway $orderRegisteringGateway
-     * @CommandHandler(inputChannelName="order.register")
-     */
+    #[CommandHandler("order.register")]
     public function register(string $order, OrderRegisteringGateway $orderRegisteringGateway): void
     {
         $orderRegisteringGateway->place($order);
@@ -22,17 +18,13 @@ class OrderService
         throw new InvalidArgumentException("test");
     }
 
-    /**
-     * @ServiceActivator(endpointId="placeOrderEndpoint", inputChannelName="placeOrder")
-     */
+    #[ServiceActivator("placeOrder", "placeOrderEndpoint")]
     public function throwExceptionOnReceive(string $order): void
     {
         throw new InvalidArgumentException("Order was not rollbacked");
     }
 
-    /**
-     * @ServiceActivator(inputChannelName="errorChannel")
-     */
+    #[ServiceActivator("errorChannel")]
     public function errorConfiguration(MessagingException $exception)
     {
         throw $exception;

@@ -16,9 +16,7 @@ use Ecotone\Messaging\Precedence;
 use Ecotone\Modelling\CommandBus;
 use Enqueue\Dbal\DbalConnectionFactory;
 
-/**
- * @ModuleAnnotation()
- */
+#[ModuleAnnotation]
 class DbalTransactionConfiguration implements AnnotationModule
 {
     private function __construct()
@@ -28,7 +26,7 @@ class DbalTransactionConfiguration implements AnnotationModule
     /**
      * @inheritDoc
      */
-    public static function create(AnnotationFinder $annotationRegistrationService)
+    public static function create(AnnotationFinder $annotationRegistrationService): static
     {
         return new self();
     }

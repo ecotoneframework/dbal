@@ -14,9 +14,7 @@ use Ecotone\Messaging\Handler\Processor\MethodInvoker\AroundInterceptorReference
 use Ecotone\Messaging\Precedence;
 use Enqueue\Dbal\DbalConnectionFactory;
 
-/**
- * @ModuleAnnotation()
- */
+#[ModuleAnnotation]
 class DeduplicationModule implements AnnotationModule
 {
     const REMOVE_MESSAGE_AFTER_7_DAYS = 1000 * 60 * 60 * 24 * 7;
@@ -28,7 +26,7 @@ class DeduplicationModule implements AnnotationModule
     /**
      * @inheritDoc
      */
-    public static function create(AnnotationFinder $annotationRegistrationService)
+    public static function create(AnnotationFinder $annotationRegistrationService): static
     {
         return new self();
     }
