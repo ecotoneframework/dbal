@@ -7,10 +7,10 @@ use Ecotone\AnnotationFinder\AnnotationFinder;
 use Ecotone\Dbal\Configuration\DbalConfiguration;
 use Ecotone\Messaging\Annotation\ModuleAnnotation;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
-use Ecotone\Messaging\Config\Annotation\ModuleConfiguration\OneTimeCommandModule;
+use Ecotone\Messaging\Config\Annotation\ModuleConfiguration\ConsoleCommandModule;
 use Ecotone\Messaging\Config\Configuration;
 use Ecotone\Messaging\Config\ModuleReferenceSearchService;
-use Ecotone\Messaging\Config\OneTimeCommandConfiguration;
+use Ecotone\Messaging\Config\ConsoleCommandConfiguration;
 use Ecotone\Messaging\Handler\Gateway\GatewayProxyBuilder;
 use Ecotone\Messaging\Handler\Gateway\ParameterToMessageConverter\GatewayHeaderBuilder;
 use Enqueue\Dbal\DbalConnectionFactory;
@@ -143,11 +143,11 @@ class DbalDeadLetterModule implements AnnotationModule
 
     private function registerOneTimeCommand(string $methodName, string $commandName, Configuration $configuration): void
     {
-        list($messageHandlerBuilder, $oneTimeCommandConfiguration) = OneTimeCommandModule::prepareOneTimeCommand(
+        list($messageHandlerBuilder, $oneTimeCommandConfiguration) = ConsoleCommandModule::prepareConsoleCommand(
             DbalDeadLetterConsoleCommand::class, $methodName, $commandName
         );
         $configuration
             ->registerMessageHandler($messageHandlerBuilder)
-            ->registerOneTimeCommand($oneTimeCommandConfiguration);
+            ->registerConsoleCommand($oneTimeCommandConfiguration);
     }
 }

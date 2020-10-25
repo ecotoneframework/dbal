@@ -17,9 +17,9 @@ class OrderService
     private int $callCounter = 0;
 
     /**
-     * @Asynchronous("orders")
      * @CommandHandler(endpointId="orderRegister", inputChannelName="order.register")
      */
+    #[Asynchronous("orders")]
     public function register(string $order, OrderRegisteringGateway $orderRegisteringGateway): void
     {
         $orderRegisteringGateway->place($order);
@@ -33,9 +33,9 @@ class OrderService
     }
 
     /**
-     * @Asynchronous("processOrders")
      * @CommandHandler(endpointId="placeOrderEndpoint", inputChannelName="placeOrder")
      */
+    #[Asynchronous("processOrders")]
     public function placeOrder(string $order) : void
     {
         $this->orders[] = $order;

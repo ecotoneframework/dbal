@@ -4,7 +4,6 @@
 namespace Ecotone\Dbal\Recoverability;
 
 
-use Ecotone\Messaging\Annotation\OneTimeCommand;
 use Ecotone\Messaging\Config\OneTimeCommandResultSet;
 use Ecotone\Messaging\Handler\Recoverability\ErrorContext;
 use Ecotone\Messaging\MessageHeaders;

@@ -3,7 +3,6 @@
 
 namespace Test\Ecotone\Dbal\Fixture\Transaction;
 
-use Ecotone\Messaging\Annotation\Poller;
 use Ecotone\Messaging\Annotation\ServiceActivator;
 use Ecotone\Messaging\MessagingException;
 use Ecotone\Modelling\Annotation\CommandHandler;

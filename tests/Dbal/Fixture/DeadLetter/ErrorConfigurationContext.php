@@ -7,15 +7,10 @@ use Ecotone\Dbal\Configuration\DbalConfiguration;
 use Ecotone\Dbal\DbalBackedMessageChannelBuilder;
 use Ecotone\Dbal\Recoverability\DbalDeadLetterBuilder;
 use Ecotone\Messaging\Annotation\ApplicationContext;
-use Ecotone\Messaging\Annotation\Extension;
-use Ecotone\Messaging\Channel\SimpleMessageChannelBuilder;
 use Ecotone\Messaging\Endpoint\PollingMetadata;
 use Ecotone\Messaging\Handler\Recoverability\ErrorHandlerConfiguration;
 use Ecotone\Messaging\Handler\Recoverability\RetryTemplateBuilder;
 
-/**
- * @ApplicationContext()
- */
 class ErrorConfigurationContext
 {
     const INPUT_CHANNEL = "inputChannel";
@@ -23,18 +18,14 @@ class ErrorConfigurationContext
     const DEAD_LETTER_CHANNEL = "deadLetterChannel";
 
 
-    /**
-     * @Extension()
-     */
+    #[ApplicationContext]
     public function getInputChannel()
     {
         return DbalBackedMessageChannelBuilder::create(self::INPUT_CHANNEL, "managerRegistry")
             ->withReceiveTimeout(1);
     }
 
-    /**
-     * @Extension()
-     */
+    #[ApplicationContext]
     public function errorConfiguration()
     {
         return ErrorHandlerConfiguration::createWithDeadLetterChannel(
@@ -45,9 +36,7 @@ class ErrorConfigurationContext
         );
     }
 
-    /**
-     * @Extension()
-     */
+    #[ApplicationContext]
     public function pollingConfiguration()
     {
         return PollingMetadata::create("orderService")
@@ -56,9 +45,7 @@ class ErrorConfigurationContext
                 ->setErrorChannelName(self::ERROR_CHANNEL);
     }
 
-    /**
-     * @Extension()
-     */
+    #[ApplicationContext]
     public function dbalConfiguration()
     {
         return DbalConfiguration::createWithDefaults()
