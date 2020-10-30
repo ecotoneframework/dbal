@@ -48,18 +48,22 @@ class DbalTransactionConfiguration implements AnnotationModule
     {
         $connectionFactories = [DbalConnectionFactory::class];
         $pointcut            = "@(" . DbalTransaction::class . ")";
+
+        $dbalConfiguration = DbalConfiguration::createWithDefaults();
         foreach ($extensionObjects as $extensionObject) {
             if ($extensionObject instanceof DbalConfiguration) {
-                if ($extensionObject->isDefaultTransactionOnAsynchronousEndpoints()) {
-                    $pointcut .= "||@(" . AsynchronousRunningEndpoint::class . ")";
-                }
-                if ($extensionObject->isDefaultTransactionOnCommandBus()) {
-                    $pointcut .= "||" . CommandBus::class . "";
-                }
-                if ($extensionObject->getDefaultConnectionReferenceNames()) {
-                    $connectionFactories = $extensionObject->getDefaultConnectionReferenceNames();
-                }
+                $dbalConfiguration = $extensionObject;
             }
+        }
+
+        if ($dbalConfiguration->isDefaultTransactionOnAsynchronousEndpoints()) {
+            $pointcut .= "||@(" . AsynchronousRunningEndpoint::class . ")";
+        }
+        if ($dbalConfiguration->isDefaultTransactionOnCommandBus()) {
+            $pointcut .= "||" . CommandBus::class . "";
+        }
+        if ($dbalConfiguration->getDefaultConnectionReferenceNames()) {
+            $connectionFactories = $dbalConfiguration->getDefaultConnectionReferenceNames();
         }
 
         $configuration
