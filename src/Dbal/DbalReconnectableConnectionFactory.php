@@ -28,6 +28,8 @@ class DbalReconnectableConnectionFactory implements ReconnectableConnectionFacto
 
     public function createContext(): Context
     {
+        $this->reconnect();
+
         return $this->connectionFactory->createContext();
     }
 
@@ -69,7 +71,13 @@ class DbalReconnectableConnectionFactory implements ReconnectableConnectionFacto
         }else {
             $connectionProperty = $reflectionClass->getProperty("connection");
             $connectionProperty->setAccessible(true);
-            $connectionProperty->setValue($this->connectionFactory, null);
+            /** @var Connection $connection */
+            $connection = $connectionProperty->getValue($this->connectionFactory);
+            if ($connection) {
+                $connection->close();
+                $connection->connect();
+                $connectionProperty->setValue($this->connectionFactory, null);
+            }
         }
     }
 }
