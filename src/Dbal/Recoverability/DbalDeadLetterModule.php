@@ -21,10 +21,10 @@ use Enqueue\Dbal\DbalConnectionFactory;
 class DbalDeadLetterModule implements AnnotationModule
 {
     const LIST_COMMAND_NAME            = "ecotone:dbal:deadletter:list";
-    const SHOW_COMMAND_NAME            = "ecotone:dbal:deadletter:show";
-    const REPLY_COMMAND_NAME           = "ecotone:dbal:deadletter:reply";
-    const REPLY_ALL_COMMAND_NAME       = "ecotone:dbal:deadletter:replyAll";
-    const DELETE_COMMAND_NAME          = "ecotone:dbal:deadletter:delete";
+    const SHOW_COMMAND_NAME       = "ecotone:dbal:deadletter:show";
+    const REPLAY_COMMAND_NAME     = "ecotone:dbal:deadletter:replay";
+    const REPLAY_ALL_COMMAND_NAME = "ecotone:dbal:deadletter:replayAll";
+    const DELETE_COMMAND_NAME     = "ecotone:dbal:deadletter:delete";
     const HELP_COMMAND_NAME = "ecotone:dbal:deadletter:help";
 
     /**
@@ -67,8 +67,8 @@ class DbalDeadLetterModule implements AnnotationModule
 
         $this->registerOneTimeCommand("list", self::LIST_COMMAND_NAME, $configuration);
         $this->registerOneTimeCommand("show", self::SHOW_COMMAND_NAME, $configuration);
-        $this->registerOneTimeCommand("reply", self::REPLY_COMMAND_NAME, $configuration);
-        $this->registerOneTimeCommand("replyAll", self::REPLY_ALL_COMMAND_NAME, $configuration);
+        $this->registerOneTimeCommand("reply", self::REPLAY_COMMAND_NAME, $configuration);
+        $this->registerOneTimeCommand("replyAll", self::REPLAY_ALL_COMMAND_NAME, $configuration);
         $this->registerOneTimeCommand("delete", self::DELETE_COMMAND_NAME, $configuration);
         $this->registerOneTimeCommand("help", self::HELP_COMMAND_NAME, $configuration);
 
@@ -104,7 +104,7 @@ class DbalDeadLetterModule implements AnnotationModule
                     DeadLetterGateway::class,
                     DeadLetterGateway::class,
                     "reply",
-                    DbalDeadLetterBuilder::REPLY_CHANNEL
+                    DbalDeadLetterBuilder::REPLAY_CHANNEL
                 )
             )
             ->registerGatewayBuilder(
@@ -112,7 +112,7 @@ class DbalDeadLetterModule implements AnnotationModule
                     DeadLetterGateway::class,
                     DeadLetterGateway::class,
                     "replyAll",
-                    DbalDeadLetterBuilder::REPLY_ALL_CHANNEL
+                    DbalDeadLetterBuilder::REPLAY_ALL_CHANNEL
                 )
             )
             ->registerGatewayBuilder(

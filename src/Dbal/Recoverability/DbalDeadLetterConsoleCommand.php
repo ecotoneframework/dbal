@@ -20,8 +20,8 @@ class DbalDeadLetterConsoleCommand
             [
                 [DbalDeadLetterModule::LIST_COMMAND_NAME . " {page:int}", "List all dead messages"],
                 [DbalDeadLetterModule::SHOW_COMMAND_NAME . " {messageId:string} {fullDetails:bool}", "Show more details about specific message"],
-                [DbalDeadLetterModule::REPLY_COMMAND_NAME . " {messageId:string}", "Reply chosen dead message"],
-                [DbalDeadLetterModule::REPLY_ALL_COMMAND_NAME, "Reply ALL dead message"],
+                [DbalDeadLetterModule::REPLAY_COMMAND_NAME . " {messageId:string}", "Replay chosen dead message"],
+                [DbalDeadLetterModule::REPLAY_ALL_COMMAND_NAME, "Replay ALL dead messages"],
                 [DbalDeadLetterModule::DELETE_COMMAND_NAME . " {messageId:string}", "Delete chosen dead message"]
             ]
         );
