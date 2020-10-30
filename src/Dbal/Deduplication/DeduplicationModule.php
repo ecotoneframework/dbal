@@ -68,7 +68,7 @@ class DeduplicationModule implements AnnotationModule
                     new DeduplicationInterceptorBuilder($connectionFactory, self::REMOVE_MESSAGE_AFTER_7_DAYS),
                     "deduplicate",
                     Precedence::DATABASE_TRANSACTION_PRECEDENCE + 100,
-                    "@(" . AsynchronousRunningEndpoint::class . ")"
+                    AsynchronousRunningEndpoint::class
                 )
             );
     }

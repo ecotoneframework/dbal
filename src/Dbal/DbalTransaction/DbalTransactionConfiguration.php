@@ -45,11 +45,11 @@ class DbalTransactionConfiguration implements AnnotationModule
     public function prepare(Configuration $configuration, array $extensionObjects, ModuleReferenceSearchService $moduleReferenceSearchService): void
     {
         $connectionFactories = [DbalConnectionFactory::class];
-        $pointcut            = "@(" . DbalTransaction::class . ")";
+        $pointcut            = DbalTransaction::class;
         foreach ($extensionObjects as $extensionObject) {
             if ($extensionObject instanceof DbalConfiguration) {
                 if ($extensionObject->isDefaultTransactionOnAsynchronousEndpoints()) {
-                    $pointcut .= "||@(" . AsynchronousRunningEndpoint::class . ")";
+                    $pointcut .= "||" . AsynchronousRunningEndpoint::class;
                 }
                 if ($extensionObject->isDefaultTransactionOnCommandBus()) {
                     $pointcut .= "||" . CommandBus::class . "";
