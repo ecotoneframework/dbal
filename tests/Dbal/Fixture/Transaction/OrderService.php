@@ -3,39 +3,57 @@
 
 namespace Test\Ecotone\Dbal\Fixture\Transaction;
 
+use Ecotone\Messaging\Annotation\Parameter\Reference;
 use Ecotone\Messaging\Annotation\Poller;
 use Ecotone\Messaging\Annotation\ServiceActivator;
 use Ecotone\Messaging\MessagingException;
 use Ecotone\Modelling\Annotation\CommandHandler;
+use Ecotone\Modelling\Annotation\QueryHandler;
+use Enqueue\Dbal\DbalConnectionFactory;
+use Enqueue\Dbal\ManagerRegistryConnectionFactory;
 use InvalidArgumentException;
 
 class OrderService
 {
     /**
-     * @param string $order
-     * @param OrderRegisteringGateway $orderRegisteringGateway
-     * @CommandHandler(inputChannelName="order.register")
+     * @CommandHandler("order.register", parameterConverters={@Reference(parameterName="connectionFactory", referenceName="Enqueue\Dbal\DbalConnectionFactory")})
      */
-    public function register(string $order, OrderRegisteringGateway $orderRegisteringGateway): void
+    public function register(string $order, ManagerRegistryConnectionFactory $connectionFactory): void
     {
-        $orderRegisteringGateway->place($order);
+        $connection = $connectionFactory->createContext()->getDbalConnection();
+
+        $connection->executeStatement(<<<SQL
+    CREATE TABLE IF NOT EXISTS orders (id VARCHAR(255) PRIMARY KEY)
+SQL);
+        $connection->executeStatement(<<<SQL
+    INSERT INTO orders VALUES (:order)
+SQL, ["order" => $order]);
 
         throw new InvalidArgumentException("test");
     }
 
     /**
-     * @ServiceActivator(endpointId="placeOrderEndpoint", inputChannelName="placeOrder")
+     * @QueryHandler("order.getRegistered", parameterConverters={@Reference(parameterName="connectionFactory", referenceName="Enqueue\Dbal\DbalConnectionFactory")})
      */
-    public function throwExceptionOnReceive(string $order): void
+    public function hasOrder(ManagerRegistryConnectionFactory $connectionFactory): array
     {
-        throw new InvalidArgumentException("Order was not rollbacked");
-    }
+        $connection = $connectionFactory->createContext()->getDbalConnection();
 
-    /**
-     * @ServiceActivator(inputChannelName="errorChannel")
-     */
-    public function errorConfiguration(MessagingException $exception)
-    {
-        throw $exception;
+        $isTableExists = $connection->executeQuery(
+            <<<SQL
+SELECT EXISTS (
+   SELECT FROM information_schema.tables 
+   WHERE  table_name   = 'orders'
+   );
+SQL
+        )->fetchOne();
+
+        if (!$isTableExists) {
+            return [];
+        }
+
+        return $connection->executeQuery(<<<SQL
+    SELECT * FROM orders
+SQL)->fetchFirstColumn();
     }
 }

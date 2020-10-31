@@ -1,6 +1,11 @@
 Feature: activating as aggregate order entity
 
   Scenario: I order with transaction a product with failure, so the order should never be placed using asynchronous AMQP Channel
+    Given I active messaging for namespace "Test\Ecotone\Dbal\Fixture\Transaction"
+    When I transactionally order "milk"
+    Then there should 0 registered orders
+
+  Scenario: I order with transaction a product with failure, so the order should never be placed using asynchronous AMQP Channel
     Given I active messaging for namespace "Test\Ecotone\Dbal\Fixture\AsynchronousChannelTransaction"
     When I transactionally order "milk"
     And I call pollable endpoint "orders"
