@@ -16,7 +16,9 @@ use Ecotone\Messaging\Precedence;
 use Ecotone\Modelling\CommandBus;
 use Enqueue\Dbal\DbalConnectionFactory;
 
-#[ModuleAnnotation]
+/**
+ * @ModuleAnnotation()
+ */
 class DbalTransactionConfiguration implements AnnotationModule
 {
     private function __construct()
@@ -26,7 +28,7 @@ class DbalTransactionConfiguration implements AnnotationModule
     /**
      * @inheritDoc
      */
-    public static function create(AnnotationFinder $annotationRegistrationService): static
+    public static function create(AnnotationFinder $annotationRegistrationService)
     {
         return new self();
     }
@@ -45,19 +47,23 @@ class DbalTransactionConfiguration implements AnnotationModule
     public function prepare(Configuration $configuration, array $extensionObjects, ModuleReferenceSearchService $moduleReferenceSearchService): void
     {
         $connectionFactories = [DbalConnectionFactory::class];
-        $pointcut            = DbalTransaction::class;
+        $pointcut            = "@(" . DbalTransaction::class . ")";
+
+        $dbalConfiguration = DbalConfiguration::createWithDefaults();
         foreach ($extensionObjects as $extensionObject) {
             if ($extensionObject instanceof DbalConfiguration) {
-                if ($extensionObject->isDefaultTransactionOnAsynchronousEndpoints()) {
-                    $pointcut .= "||" . AsynchronousRunningEndpoint::class;
-                }
-                if ($extensionObject->isDefaultTransactionOnCommandBus()) {
-                    $pointcut .= "||" . CommandBus::class . "";
-                }
-                if ($extensionObject->getDefaultConnectionReferenceNames()) {
-                    $connectionFactories = $extensionObject->getDefaultConnectionReferenceNames();
-                }
+                $dbalConfiguration = $extensionObject;
             }
+        }
+
+        if ($dbalConfiguration->isDefaultTransactionOnAsynchronousEndpoints()) {
+            $pointcut .= "||@(" . AsynchronousRunningEndpoint::class . ")";
+        }
+        if ($dbalConfiguration->isDefaultTransactionOnCommandBus()) {
+            $pointcut .= "||" . CommandBus::class . "";
+        }
+        if ($dbalConfiguration->getDefaultConnectionReferenceNames()) {
+            $connectionFactories = $dbalConfiguration->getDefaultConnectionReferenceNames();
         }
 
         $configuration

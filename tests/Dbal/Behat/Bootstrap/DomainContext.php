@@ -73,11 +73,21 @@ class DomainContext extends TestCase implements Context
 
         $managerRegistryConnectionFactory = new ManagerRegistryConnectionFactory(new DbalConnectionManagerRegistryWrapper(new DbalConnectionFactory(["dsn" => 'pgsql://ecotone:secret@database:5432/ecotone'])));
         $connection = $managerRegistryConnectionFactory->createContext()->getDbalConnection();
-        $connection->executeUpdate("DELETE FROM enqueue");
+        $isTableExists = $connection->executeQuery(
+            <<<SQL
+SELECT EXISTS (
+   SELECT FROM information_schema.tables 
+   WHERE  table_name   = 'enqueue'
+   );
+SQL
+        )->fetchOne();
+        if ($isTableExists) {
+            $connection->executeUpdate("DELETE FROM enqueue");
+        }
 
         self::$messagingSystem            = EcotoneLiteConfiguration::createWithConfiguration(
             __DIR__ . "/../../../../",
-            InMemoryPSRContainer::createFromObjects(array_merge($objects, ["managerRegistry" => $managerRegistryConnectionFactory])),
+            InMemoryPSRContainer::createFromObjects(array_merge($objects, ["managerRegistry" => $managerRegistryConnectionFactory, DbalConnectionFactory::class => $managerRegistryConnectionFactory])),
             ApplicationConfiguration::createWithDefaults()
                 ->withNamespaces([$namespace])
                 ->withCacheDirectoryPath(sys_get_temp_dir() . DIRECTORY_SEPARATOR . Uuid::uuid4()->toString())

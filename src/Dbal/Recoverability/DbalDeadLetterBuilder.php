@@ -27,10 +27,10 @@ class DbalDeadLetterBuilder extends InputOutputMessageHandlerBuilder
     const OFFSET_HEADER = "ecotone.dbal.deadletter.offset";
 
     const LIST_CHANNEL  = "ecotone.dbal.deadletter.list";
-    const SHOW_CHANNEL  = "ecotone.dbal.deadletter.show";
-    const REPLY_CHANNEL = "ecotone.dbal.deadletter.reply";
-    const REPLY_ALL_CHANNEL = "ecotone.dbal.deadletter.replyAll";
-    const DELETE_CHANNEL    = "ecotone.dbal.deadletter.delete";
+    const SHOW_CHANNEL       = "ecotone.dbal.deadletter.show";
+    const REPLAY_CHANNEL     = "ecotone.dbal.deadletter.reply";
+    const REPLAY_ALL_CHANNEL = "ecotone.dbal.deadletter.replyAll";
+    const DELETE_CHANNEL     = "ecotone.dbal.deadletter.delete";
     const STORE_CHANNEL     = "dbal_dead_letter";
 
     private string $methodName;
@@ -65,13 +65,13 @@ class DbalDeadLetterBuilder extends InputOutputMessageHandlerBuilder
 
     public static function createReply(string $connectionReferenceName): self
     {
-        return new self("reply", $connectionReferenceName, self::REPLY_CHANNEL, []);
+        return new self("reply", $connectionReferenceName, self::REPLAY_CHANNEL, []);
     }
 
     public static function createReplyAll(string $connectionReferenceName): self
     {
         return new self(
-            "replyAll", $connectionReferenceName, self::REPLY_ALL_CHANNEL, [
+            "replyAll", $connectionReferenceName, self::REPLAY_ALL_CHANNEL, [
             ReferenceBuilder::create("messagingEntrypoint", MessagingEntrypoint::class)
         ]
         );
