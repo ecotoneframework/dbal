@@ -16,9 +16,7 @@ use Ecotone\Messaging\Precedence;
 use Ecotone\Modelling\CommandBus;
 use Enqueue\Dbal\DbalConnectionFactory;
 
-/**
- * @ModuleAnnotation()
- */
+#[ModuleAnnotation]
 class DbalTransactionConfiguration implements AnnotationModule
 {
     private function __construct()
@@ -28,17 +26,9 @@ class DbalTransactionConfiguration implements AnnotationModule
     /**
      * @inheritDoc
      */
-    public static function create(AnnotationFinder $annotationRegistrationService)
+    public static function create(AnnotationFinder $annotationRegistrationService): static
     {
         return new self();
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function getName(): string
-    {
-        return "DbalTransactionModule";
     }
 
     /**
@@ -47,7 +37,7 @@ class DbalTransactionConfiguration implements AnnotationModule
     public function prepare(Configuration $configuration, array $extensionObjects, ModuleReferenceSearchService $moduleReferenceSearchService): void
     {
         $connectionFactories = [DbalConnectionFactory::class];
-        $pointcut            = "@(" . DbalTransaction::class . ")";
+        $pointcut            = "(" . DbalTransaction::class . ")";
 
         $dbalConfiguration = DbalConfiguration::createWithDefaults();
         foreach ($extensionObjects as $extensionObject) {
@@ -57,10 +47,10 @@ class DbalTransactionConfiguration implements AnnotationModule
         }
 
         if ($dbalConfiguration->isDefaultTransactionOnAsynchronousEndpoints()) {
-            $pointcut .= "||@(" . AsynchronousRunningEndpoint::class . ")";
+            $pointcut .= "||(" . AsynchronousRunningEndpoint::class . ")";
         }
         if ($dbalConfiguration->isDefaultTransactionOnCommandBus()) {
-            $pointcut .= "||" . CommandBus::class . "";
+            $pointcut .= "||(" . CommandBus::class . ")";
         }
         if ($dbalConfiguration->getDefaultConnectionReferenceNames()) {
             $connectionFactories = $dbalConfiguration->getDefaultConnectionReferenceNames();
@@ -69,12 +59,12 @@ class DbalTransactionConfiguration implements AnnotationModule
         $configuration
             ->requireReferences($connectionFactories)
             ->registerAroundMethodInterceptor(
-                AroundInterceptorReference::createWithObjectBuilder(
-                    DbalTransactionInterceptor::class,
-                    new DbalTransactionInterceptorBuilder($connectionFactories),
+                AroundInterceptorReference::createWithDirectObject(
+                    new DbalTransactionInterceptor($connectionFactories),
                     "transactional",
                     Precedence::DATABASE_TRANSACTION_PRECEDENCE,
-                    $pointcut
+                    $pointcut,
+                    []
                 )
             );
     }

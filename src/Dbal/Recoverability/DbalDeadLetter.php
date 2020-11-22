@@ -24,6 +24,7 @@ use function json_encode;
 
 class DbalDeadLetter
 {
+    const DEFAULT_DEAD_LETTER_TABLE = "ecotone_error_messages";
     private ConnectionFactory $connectionFactory;
     private bool $isInitialized = false;
     private HeaderMapper $headerMapper;
@@ -167,7 +168,7 @@ class DbalDeadLetter
 
     private function getTableName(): string
     {
-        return "ecotone_error_messages";
+        return self::DEFAULT_DEAD_LETTER_TABLE;
     }
 
     private function createDataBaseTable(): void

@@ -4,6 +4,8 @@ namespace Ecotone\Dbal\Deduplication;
 
 use Ecotone\AnnotationFinder\AnnotationFinder;
 use Ecotone\Dbal\Configuration\DbalConfiguration;
+use Ecotone\Dbal\DbalReconnectableConnectionFactory;
+use Ecotone\Enqueue\CachedConnectionFactory;
 use Ecotone\Messaging\Annotation\AsynchronousRunningEndpoint;
 use Ecotone\Messaging\Annotation\ModuleAnnotation;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
@@ -12,6 +14,7 @@ use Ecotone\Messaging\Config\ConfigurationException;
 use Ecotone\Messaging\Config\ModuleReferenceSearchService;
 use Ecotone\Messaging\Handler\Processor\MethodInvoker\AroundInterceptorReference;
 use Ecotone\Messaging\Precedence;
+use Ecotone\Messaging\Scheduling\EpochBasedClock;
 use Enqueue\Dbal\DbalConnectionFactory;
 
 #[ModuleAnnotation]
@@ -29,14 +32,6 @@ class DeduplicationModule implements AnnotationModule
     public static function create(AnnotationFinder $annotationRegistrationService): static
     {
         return new self();
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function getName(): string
-    {
-        return "DbalDeduplicationModule";
     }
 
     /**
@@ -63,12 +58,16 @@ class DeduplicationModule implements AnnotationModule
 
         $configuration
             ->registerAroundMethodInterceptor(
-                AroundInterceptorReference::createWithObjectBuilder(
-                    DeduplicationInterceptor::class,
-                    new DeduplicationInterceptorBuilder($connectionFactory, self::REMOVE_MESSAGE_AFTER_7_DAYS),
+                AroundInterceptorReference::createWithDirectObject(
+                    new DeduplicationInterceptor(
+                        $connectionFactory,
+                        new EpochBasedClock(),
+                        self::REMOVE_MESSAGE_AFTER_7_DAYS
+                    ),
                     "deduplicate",
                     Precedence::DATABASE_TRANSACTION_PRECEDENCE + 100,
-                    AsynchronousRunningEndpoint::class
+                    AsynchronousRunningEndpoint::class,
+                    []
                 )
             );
     }

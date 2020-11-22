@@ -4,7 +4,7 @@
 namespace Ecotone\Dbal\Recoverability;
 
 
-use Ecotone\Messaging\Config\OneTimeCommandResultSet;
+use Ecotone\Messaging\Config\ConsoleCommandResultSet;
 use Ecotone\Messaging\Handler\Recoverability\ErrorContext;
 use Ecotone\Messaging\MessageHeaders;
 
@@ -12,9 +12,9 @@ class DbalDeadLetterConsoleCommand
 {
     const PAGE_LIMIT = 20;
 
-    public function help() : OneTimeCommandResultSet
+    public function help() : ConsoleCommandResultSet
     {
-        return OneTimeCommandResultSet::create(
+        return ConsoleCommandResultSet::create(
             ["Command Name", "Description"],
             [
                 [DbalDeadLetterModule::LIST_COMMAND_NAME . " {page:int}", "List all dead messages"],
@@ -26,12 +26,12 @@ class DbalDeadLetterConsoleCommand
         );
     }
 
-    public function list(DeadLetterGateway $deadLetterGateway, int $page = 0) : OneTimeCommandResultSet
+    public function list(DeadLetterGateway $deadLetterGateway, int $page = 0) : ConsoleCommandResultSet
     {
         $limit = self::PAGE_LIMIT;
         $offset = $page * self::PAGE_LIMIT;
 
-        return OneTimeCommandResultSet::create(
+        return ConsoleCommandResultSet::create(
             ["Message Id", "Failed At", "Stacktrace"],
             array_map(function(ErrorContext $errorContext) {
                 return [
@@ -43,11 +43,11 @@ class DbalDeadLetterConsoleCommand
         );
     }
 
-    public function show(DeadLetterGateway $deadLetterGateway, string $messageId, bool $fullDetails = false) : OneTimeCommandResultSet
+    public function show(DeadLetterGateway $deadLetterGateway, string $messageId, bool $fullDetails = false) : ConsoleCommandResultSet
     {
         $message = $deadLetterGateway->show($messageId);
 
-        return OneTimeCommandResultSet::create(
+        return ConsoleCommandResultSet::create(
             [],
             [
                 ["Message Id", $message->getHeaders()->getMessageId()],

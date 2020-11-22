@@ -36,14 +36,6 @@ class DbalDeadLetterModule implements AnnotationModule
     /**
      * @inheritDoc
      */
-    public function getName(): string
-    {
-        return "dbalRecoverabilityModule";
-    }
-
-    /**
-     * @inheritDoc
-     */
     public function prepare(Configuration $configuration, array $extensionObjects, ModuleReferenceSearchService $moduleReferenceSearchService): void
     {
         $isDeadLetterEnabled = false;
@@ -142,7 +134,7 @@ class DbalDeadLetterModule implements AnnotationModule
     private function registerOneTimeCommand(string $methodName, string $commandName, Configuration $configuration): void
     {
         list($messageHandlerBuilder, $oneTimeCommandConfiguration) = ConsoleCommandModule::prepareConsoleCommand(
-            DbalDeadLetterConsoleCommand::class, $methodName, $commandName
+            null, DbalDeadLetterConsoleCommand::class, $methodName, $commandName
         );
         $configuration
             ->registerMessageHandler($messageHandlerBuilder)

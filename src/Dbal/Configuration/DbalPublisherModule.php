@@ -35,14 +35,6 @@ class DbalPublisherModule implements AnnotationModule
     /**
      * @inheritDoc
      */
-    public function getName(): string
-    {
-        return "dbalPublisherModule";
-    }
-
-    /**
-     * @inheritDoc
-     */
     public function prepare(Configuration $configuration, array $extensionObjects, ModuleReferenceSearchService $moduleReferenceSearchService): void
     {
         $registeredReferences = [];

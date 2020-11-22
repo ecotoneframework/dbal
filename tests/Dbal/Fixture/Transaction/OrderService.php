@@ -15,6 +15,8 @@ use InvalidArgumentException;
 
 class OrderService
 {
+    const ORDER_TABLE = "orders";
+
     #[CommandHandler("order.register")]
     public function register(string $order, #[Reference(DbalConnectionFactory::class)] ManagerRegistryConnectionFactory $connectionFactory): void
     {
@@ -35,6 +37,19 @@ SQL, ["order" => $order]);
     {
         $connection = $connectionFactory->createContext()->getDbalConnection();
 
+        $isTableExists = $this->doesTableExists($connection);
+
+        if (!$isTableExists) {
+            return [];
+        }
+
+        return $connection->executeQuery(<<<SQL
+    SELECT * FROM orders
+SQL)->fetchFirstColumn();
+    }
+
+    private function doesTableExists(\Doctrine\DBAL\Connection $connection)
+    {
         $isTableExists = $connection->executeQuery(
             <<<SQL
 SELECT EXISTS (
@@ -44,12 +59,6 @@ SELECT EXISTS (
 SQL
         )->fetchOne();
 
-        if (!$isTableExists) {
-            return [];
-        }
-
-        return $connection->executeQuery(<<<SQL
-    SELECT * FROM orders
-SQL)->fetchFirstColumn();
+        return $isTableExists;
     }
 }

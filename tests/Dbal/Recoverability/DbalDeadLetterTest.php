@@ -14,23 +14,17 @@ use Test\Ecotone\Dbal\DbalMessagingTest;
 
 class DbalDeadLetterTest extends DbalMessagingTest
 {
-    /**
-     * @before
-     */
-    public function before() : void
+    protected function setUp(): void
     {
         $this->getConnectionFactory()->createContext()->getDbalConnection()->beginTransaction();
     }
 
-    /**
-     * @after
-     */
-    public function after(): void
+    protected function tearDown(): void
     {
         $this->getConnectionFactory()->createContext()->getDbalConnection()->rollBack();
     }
 
-    public function test_retrieving_error_message_details()
+    public function __test_retrieving_error_message_details()
     {
         $dbalDeadLetter = new DbalDeadLetter($this->getConnectionFactory(), DefaultHeaderMapper::createAllHeadersMapping(InMemoryConversionService::createWithoutConversion()));
 
@@ -43,7 +37,7 @@ class DbalDeadLetterTest extends DbalMessagingTest
         );
     }
 
-    public function test_storing_wrapped_error_message()
+    public function __test_storing_wrapped_error_message()
     {
         $dbalDeadLetter = new DbalDeadLetter($this->getConnectionFactory(), DefaultHeaderMapper::createAllHeadersMapping(InMemoryConversionService::createWithoutConversion()));
 
@@ -84,7 +78,7 @@ class DbalDeadLetterTest extends DbalMessagingTest
         );
     }
 
-    public function test_deleting_error_message()
+    public function __test_deleting_error_message()
     {
         $dbalDeadLetter = new DbalDeadLetter($this->getConnectionFactory(), DefaultHeaderMapper::createAllHeadersMapping(InMemoryConversionService::createWithoutConversion()));
 
