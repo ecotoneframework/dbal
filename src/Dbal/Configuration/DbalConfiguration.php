@@ -9,13 +9,15 @@ class DbalConfiguration
 {
     const DEFAULT_TRANSACTION_ON_ASYNCHRONOUS_ENDPOINTS = true;
     const DEFAULT_TRANSACTION_ON_COMMAND_BUS = true;
+    const DEFAULT_TRANSACTION_ON_CONSOLE_COMMANDS = true;
+    const DEFAULT_CLEAR_OBJECT_MANAGER_ON_ASYNCHRONOUS_ENDPOINTS = true;
     const DEFAULT_DEDUPLICATION_ENABLED = false;
     const DEFAULT_DEAD_LETTER_ENABLED = false;
 
-    private bool $defaultTransactionOnAsynchronousEndpoints = self::DEFAULT_TRANSACTION_ON_ASYNCHRONOUS_ENDPOINTS;
-
-    private bool $defaultTransactionOnCommandBus = self::DEFAULT_TRANSACTION_ON_COMMAND_BUS;
-
+    private bool $transactionOnAsynchronousEndpoints = self::DEFAULT_TRANSACTION_ON_ASYNCHRONOUS_ENDPOINTS;
+    private bool $transactionOnCommandBus = self::DEFAULT_TRANSACTION_ON_COMMAND_BUS;
+    private bool $transactionOnConsoleCommands = self::DEFAULT_TRANSACTION_ON_CONSOLE_COMMANDS;
+    private bool $clearObjectManagerOnAsynchronousEndpoints = self::DEFAULT_CLEAR_OBJECT_MANAGER_ON_ASYNCHRONOUS_ENDPOINTS;
     private array $defaultConnectionReferenceNames = [DbalConnectionFactory::class];
 
     private bool $deduplicatedEnabled = self::DEFAULT_DEDUPLICATION_ENABLED;
@@ -62,16 +64,32 @@ class DbalConfiguration
 
     public function withTransactionOnAsynchronousEndpoints(bool $isTransactionEnabled) : self
     {
-        $self = clone $this;
-        $self->defaultTransactionOnAsynchronousEndpoints = $isTransactionEnabled;
+        $self                                     = clone $this;
+        $self->transactionOnAsynchronousEndpoints = $isTransactionEnabled;
 
         return $self;
     }
 
     public function withTransactionOnCommandBus(bool $isTransactionEnabled) : self
     {
-        $self = clone $this;
-        $self->defaultTransactionOnCommandBus = $isTransactionEnabled;
+        $self                          = clone $this;
+        $self->transactionOnCommandBus = $isTransactionEnabled;
+
+        return $self;
+    }
+
+    public function withTransactionOnConsoleCommands(bool $isTransactionEnabled) : self
+    {
+        $self                          = clone $this;
+        $self->transactionOnConsoleCommands = $isTransactionEnabled;
+
+        return $self;
+    }
+
+    public function withCleanObjectManagerOnAsynchronousEndpoints(bool $isTransactionEnabled) : self
+    {
+        $self                                     = clone $this;
+        $self->clearObjectManagerOnAsynchronousEndpoints = $isTransactionEnabled;
 
         return $self;
     }
@@ -112,27 +130,28 @@ class DbalConfiguration
         return $this->deadLetterEnabled;
     }
 
-    /**
-     * @return bool
-     */
-    public function isDefaultTransactionOnAsynchronousEndpoints(): bool
+    public function isTransactionOnAsynchronousEndpoints(): bool
     {
-        return $this->defaultTransactionOnAsynchronousEndpoints;
+        return $this->transactionOnAsynchronousEndpoints;
     }
 
-    /**
-     * @return bool
-     */
-    public function isDefaultTransactionOnCommandBus(): bool
+    public function isTransactionOnCommandBus(): bool
     {
-        return $this->defaultTransactionOnCommandBus;
+        return $this->transactionOnCommandBus;
     }
 
-    /**
-     * @return array
-     */
+    public function isTransactionOnConsoleCommands(): bool
+    {
+        return $this->transactionOnConsoleCommands;
+    }
+
     public function getDefaultConnectionReferenceNames(): array
     {
         return $this->defaultConnectionReferenceNames;
+    }
+
+    public function isClearObjectManagerOnAsynchronousEndpoints(): bool
+    {
+        return $this->clearObjectManagerOnAsynchronousEndpoints;
     }
 }

@@ -18,12 +18,12 @@ use Enqueue\Dbal\DbalConnectionFactory;
 #[ModuleAnnotation]
 class DbalDeadLetterModule implements AnnotationModule
 {
-    const LIST_COMMAND_NAME            = "ecotone:dbal:deadletter:list";
-    const SHOW_COMMAND_NAME       = "ecotone:dbal:deadletter:show";
-    const REPLAY_COMMAND_NAME     = "ecotone:dbal:deadletter:replay";
-    const REPLAY_ALL_COMMAND_NAME = "ecotone:dbal:deadletter:replayAll";
-    const DELETE_COMMAND_NAME     = "ecotone:dbal:deadletter:delete";
-    const HELP_COMMAND_NAME = "ecotone:dbal:deadletter:help";
+    const HELP_COMMAND_NAME = "ecotone:deadletter:help";
+    const LIST_COMMAND_NAME            = "ecotone:deadletter:list";
+    const SHOW_COMMAND_NAME       = "ecotone:deadletter:show";
+    const REPLAY_COMMAND_NAME     = "ecotone:deadletter:replay";
+    const REPLAY_ALL_COMMAND_NAME = "ecotone:deadletter:replayAll";
+    const DELETE_COMMAND_NAME     = "ecotone:deadletter:delete";
 
     /**
      * @inheritDoc
@@ -133,8 +133,8 @@ class DbalDeadLetterModule implements AnnotationModule
 
     private function registerOneTimeCommand(string $methodName, string $commandName, Configuration $configuration): void
     {
-        list($messageHandlerBuilder, $oneTimeCommandConfiguration) = ConsoleCommandModule::prepareConsoleCommand(
-            null, DbalDeadLetterConsoleCommand::class, $methodName, $commandName
+        list($messageHandlerBuilder, $oneTimeCommandConfiguration) = ConsoleCommandModule::prepareConsoleCommandForDirectObject(
+            new DbalDeadLetterConsoleCommand(), $methodName, $commandName, true
         );
         $configuration
             ->registerMessageHandler($messageHandlerBuilder)

@@ -5,6 +5,7 @@ namespace Ecotone\Dbal\DbalTransaction;
 use Ecotone\AnnotationFinder\AnnotationFinder;
 use Ecotone\Dbal\Configuration\DbalConfiguration;
 use Ecotone\Messaging\Annotation\AsynchronousRunningEndpoint;
+use Ecotone\Messaging\Annotation\ConsoleCommand;
 use Ecotone\Messaging\Annotation\ModuleAnnotation;
 use Ecotone\Messaging\Annotation\PollableEndpoint;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
@@ -17,7 +18,7 @@ use Ecotone\Modelling\CommandBus;
 use Enqueue\Dbal\DbalConnectionFactory;
 
 #[ModuleAnnotation]
-class DbalTransactionConfiguration implements AnnotationModule
+class DbalTransactionModule implements AnnotationModule
 {
     private function __construct()
     {
@@ -46,11 +47,14 @@ class DbalTransactionConfiguration implements AnnotationModule
             }
         }
 
-        if ($dbalConfiguration->isDefaultTransactionOnAsynchronousEndpoints()) {
+        if ($dbalConfiguration->isTransactionOnAsynchronousEndpoints()) {
             $pointcut .= "||(" . AsynchronousRunningEndpoint::class . ")";
         }
-        if ($dbalConfiguration->isDefaultTransactionOnCommandBus()) {
+        if ($dbalConfiguration->isTransactionOnCommandBus()) {
             $pointcut .= "||(" . CommandBus::class . ")";
+        }
+        if ($dbalConfiguration->isTransactionOnConsoleCommands()) {
+            $pointcut .= "||(" . ConsoleCommand::class . ")";
         }
         if ($dbalConfiguration->getDefaultConnectionReferenceNames()) {
             $connectionFactories = $dbalConfiguration->getDefaultConnectionReferenceNames();
