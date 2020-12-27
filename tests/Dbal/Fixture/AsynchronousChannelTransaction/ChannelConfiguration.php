@@ -5,12 +5,12 @@ namespace Test\Ecotone\Dbal\Fixture\AsynchronousChannelTransaction;
 
 use Ecotone\Dbal\Configuration\DbalConfiguration;
 use Ecotone\Dbal\DbalBackedMessageChannelBuilder;
-use Ecotone\Messaging\Annotation\ApplicationContext;
+use Ecotone\Messaging\Annotation\ServiceContext;
 use Ecotone\Messaging\Endpoint\PollingMetadata;
 
 class ChannelConfiguration
 {
-    #[ApplicationContext]
+    #[ServiceContext]
     public function registerCommandChannel(): array
     {
         return [

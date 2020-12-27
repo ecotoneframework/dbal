@@ -9,7 +9,7 @@ use Ecotone\Dbal\Recoverability\DbalDeadLetter;
 use Ecotone\Dbal\Recoverability\DeadLetterGateway;
 use Ecotone\Lite\EcotoneLiteConfiguration;
 use Ecotone\Lite\InMemoryPSRContainer;
-use Ecotone\Messaging\Config\ApplicationConfiguration;
+use Ecotone\Messaging\Config\ServiceConfiguration;
 use Ecotone\Messaging\Config\ConfigurationException;
 use Ecotone\Messaging\Config\ConfiguredMessagingSystem;
 use Ecotone\Messaging\Conversion\MediaType;
@@ -85,9 +85,10 @@ SQL
         self::$messagingSystem            = EcotoneLiteConfiguration::createWithConfiguration(
             __DIR__ . "/../../../../",
             InMemoryPSRContainer::createFromObjects(array_merge($objects, ["managerRegistry" => $managerRegistryConnectionFactory, DbalConnectionFactory::class => $managerRegistryConnectionFactory])),
-            ApplicationConfiguration::createWithDefaults()
+            ServiceConfiguration::createWithDefaults()
                 ->withNamespaces([$namespace])
-                ->withCacheDirectoryPath(sys_get_temp_dir() . DIRECTORY_SEPARATOR . Uuid::uuid4()->toString())
+                ->withCacheDirectoryPath(sys_get_temp_dir() . DIRECTORY_SEPARATOR . Uuid::uuid4()->toString()),
+            []
         );
     }
 
@@ -113,7 +114,7 @@ SQL, ["tableName" => $tableName]
      */
     public function iActiveReceiver(string $receiverName)
     {
-        self::$messagingSystem->runSeparatelyRunningEndpointBy($receiverName);
+        self::$messagingSystem->runAsynchronouslyRunningEndpoint($receiverName);
     }
 
     /**
@@ -166,7 +167,7 @@ SQL, ["tableName" => $tableName]
      */
     public function iCallPollableEndpoint(string $consumerId)
     {
-        self::$messagingSystem->runSeparatelyRunningEndpointBy($consumerId);
+        self::$messagingSystem->runAsynchronouslyRunningEndpoint($consumerId);
     }
 
     /**

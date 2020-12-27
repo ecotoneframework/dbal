@@ -134,8 +134,7 @@ class DbalDeadLetter
                 ->removeHeaders([
                     MessageHeaders::DELIVERY_DELAY,
                     MessageHeaders::TIME_TO_LIVE,
-                    MessageHeaders::CONSUMER_ACK_HEADER_LOCATION,
-                    MessageHeaders::POLLED_CHANNEL
+                    MessageHeaders::CONSUMER_ACK_HEADER_LOCATION
                 ])
                 ->build();
         }

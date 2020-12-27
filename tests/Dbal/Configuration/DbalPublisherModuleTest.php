@@ -9,7 +9,7 @@ use Ecotone\AnnotationFinder\InMemory\InMemoryAnnotationFinder;
 use Ecotone\Dbal\Configuration\DbalPublisherModule;
 use Ecotone\Dbal\Configuration\DbalMessagePublisherConfiguration;
 use Ecotone\Dbal\DbalOutboundChannelAdapterBuilder;
-use Ecotone\Messaging\Config\ApplicationConfiguration;
+use Ecotone\Messaging\Config\ServiceConfiguration;
 use Ecotone\Messaging\Config\Configuration;
 use Ecotone\Messaging\Config\ConfigurationException;
 use Ecotone\Messaging\Config\InMemoryModuleMessaging;
@@ -166,7 +166,7 @@ class DbalPublisherModuleTest extends TestCase
             $this->prepareConfiguration(
                 [
                     DbalMessagePublisherConfiguration::create(MessagePublisher::class, "queueName", MediaType::APPLICATION_JSON, "connection"),
-                    ApplicationConfiguration::createWithDefaults()
+                    ServiceConfiguration::createWithDefaults()
                         ->withDefaultSerializationMediaType(MediaType::APPLICATION_JSON)
                 ]
             )

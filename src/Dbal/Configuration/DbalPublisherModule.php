@@ -8,7 +8,7 @@ use Ecotone\Dbal\DbalOutboundChannelAdapterBuilder;
 use Ecotone\Messaging\Annotation\ModuleAnnotation;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
 use Ecotone\Messaging\Config\Annotation\AnnotationRegistrationService;
-use Ecotone\Messaging\Config\ApplicationConfiguration;
+use Ecotone\Messaging\Config\ServiceConfiguration;
 use Ecotone\Messaging\Config\Configuration;
 use Ecotone\Messaging\Config\ConfigurationException;
 use Ecotone\Messaging\Config\ModuleReferenceSearchService;
@@ -38,10 +38,10 @@ class DbalPublisherModule implements AnnotationModule
     public function prepare(Configuration $configuration, array $extensionObjects, ModuleReferenceSearchService $moduleReferenceSearchService): void
     {
         $registeredReferences = [];
-        /** @var ApplicationConfiguration $applicationConfiguration */
+        /** @var ServiceConfiguration $applicationConfiguration */
         $applicationConfiguration = null;
         foreach ($extensionObjects as $extensionObject) {
-            if ($extensionObject instanceof ApplicationConfiguration) {
+            if ($extensionObject instanceof ServiceConfiguration) {
                 $applicationConfiguration = $extensionObject;
                 break;
             }
@@ -117,7 +117,7 @@ class DbalPublisherModule implements AnnotationModule
     {
         return
             $extensionObject instanceof DbalMessagePublisherConfiguration
-            || $extensionObject instanceof ApplicationConfiguration;
+            || $extensionObject instanceof ServiceConfiguration;
     }
 
     /**
