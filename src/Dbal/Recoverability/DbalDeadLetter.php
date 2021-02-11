@@ -150,7 +150,7 @@ class DbalDeadLetter
                 'message_id' => $headers[MessageHeaders::MESSAGE_ID],
                 'failed_at' =>  new \DateTime(date('Y-m-d H:i:s.u', $headers[MessageHeaders::TIMESTAMP])),
                 'payload' => $payload,
-                'headers' => \json_encode($this->headerMapper->mapFromMessageHeaders($headers), JSON_THROW_ON_ERROR)
+                'headers' => \json_encode($this->headerMapper->mapFromMessageHeaders($headers), JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_IGNORE)
             ],
             [
                 'message_id' => Types::TEXT,
