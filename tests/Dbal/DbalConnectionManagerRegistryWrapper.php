@@ -2,7 +2,7 @@
 
 namespace Test\Ecotone\Dbal;
 
-use Doctrine\Common\Persistence\ManagerRegistry;
+use Doctrine\Persistence\ManagerRegistry;
 use Enqueue\Dbal\DbalConnectionFactory;
 
 class DbalConnectionManagerRegistryWrapper implements ManagerRegistry
