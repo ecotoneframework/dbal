@@ -41,6 +41,8 @@
         "doctrine/orm": "^2.8.2"
     },
     "extra": {
-        "branch-version": "1.x"
+        "branch-alias": {
+            "dev-master": "1.0.x-dev"
+        }
     }
 }
