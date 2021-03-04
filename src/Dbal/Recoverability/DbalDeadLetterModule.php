@@ -5,7 +5,7 @@ namespace Ecotone\Dbal\Recoverability;
 
 use Ecotone\AnnotationFinder\AnnotationFinder;
 use Ecotone\Dbal\Configuration\DbalConfiguration;
-use Ecotone\Messaging\Annotation\ModuleAnnotation;
+use Ecotone\Messaging\Attribute\ModuleAnnotation;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
 use Ecotone\Messaging\Config\Annotation\ModuleConfiguration\ConsoleCommandModule;
 use Ecotone\Messaging\Config\Configuration;
@@ -127,6 +127,11 @@ class DbalDeadLetterModule implements AnnotationModule
      * @inheritDoc
      */
     public function getRelatedReferences(): array
+    {
+        return [];
+    }
+
+    public function getModuleExtensions(array $serviceExtensions): array
     {
         return [];
     }

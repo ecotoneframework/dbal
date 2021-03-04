@@ -5,7 +5,7 @@ namespace Ecotone\Dbal\Configuration;
 
 use Ecotone\AnnotationFinder\AnnotationFinder;
 use Ecotone\Dbal\DbalOutboundChannelAdapterBuilder;
-use Ecotone\Messaging\Annotation\ModuleAnnotation;
+use Ecotone\Messaging\Attribute\ModuleAnnotation;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
 use Ecotone\Messaging\Config\Annotation\AnnotationRegistrationService;
 use Ecotone\Messaging\Config\ServiceConfiguration;
@@ -118,6 +118,11 @@ class DbalPublisherModule implements AnnotationModule
         return
             $extensionObject instanceof DbalMessagePublisherConfiguration
             || $extensionObject instanceof ServiceConfiguration;
+    }
+
+    public function getModuleExtensions(array $serviceExtensions): array
+    {
+        return [];
     }
 
     /**

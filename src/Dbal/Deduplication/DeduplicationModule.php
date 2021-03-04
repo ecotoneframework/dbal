@@ -6,8 +6,8 @@ use Ecotone\AnnotationFinder\AnnotationFinder;
 use Ecotone\Dbal\Configuration\DbalConfiguration;
 use Ecotone\Dbal\DbalReconnectableConnectionFactory;
 use Ecotone\Enqueue\CachedConnectionFactory;
-use Ecotone\Messaging\Annotation\AsynchronousRunningEndpoint;
-use Ecotone\Messaging\Annotation\ModuleAnnotation;
+use Ecotone\Messaging\Attribute\AsynchronousRunningEndpoint;
+use Ecotone\Messaging\Attribute\ModuleAnnotation;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
 use Ecotone\Messaging\Config\Configuration;
 use Ecotone\Messaging\Config\ConfigurationException;
@@ -78,6 +78,11 @@ class DeduplicationModule implements AnnotationModule
     public function canHandle($extensionObject): bool
     {
         return $extensionObject instanceof DbalConfiguration;
+    }
+
+    public function getModuleExtensions(array $serviceExtensions): array
+    {
+        return [];
     }
 
     /**

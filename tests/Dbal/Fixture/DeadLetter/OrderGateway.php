@@ -2,7 +2,7 @@
 
 namespace Test\Ecotone\Dbal\Fixture\DeadLetter;
 
-use Ecotone\Messaging\Annotation\MessageGateway;
+use Ecotone\Messaging\Attribute\MessageGateway;
 
 interface OrderGateway
 {

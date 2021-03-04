@@ -5,7 +5,7 @@ namespace Test\Ecotone\Dbal\Fixture\AsynchronousChannelTransaction;
 
 use Ecotone\Dbal\Configuration\DbalConfiguration;
 use Ecotone\Dbal\DbalBackedMessageChannelBuilder;
-use Ecotone\Messaging\Annotation\ServiceContext;
+use Ecotone\Messaging\Attribute\ServiceContext;
 use Ecotone\Messaging\Endpoint\PollingMetadata;
 
 class ChannelConfiguration

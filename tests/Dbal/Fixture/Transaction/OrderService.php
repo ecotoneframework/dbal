@@ -3,12 +3,12 @@
 
 namespace Test\Ecotone\Dbal\Fixture\Transaction;
 
-use Ecotone\Messaging\Annotation\Parameter\Reference;
-use Ecotone\Messaging\Annotation\Poller;
-use Ecotone\Messaging\Annotation\ServiceActivator;
+use Ecotone\Messaging\Attribute\Parameter\Reference;
+use Ecotone\Messaging\Attribute\Poller;
+use Ecotone\Messaging\Attribute\ServiceActivator;
 use Ecotone\Messaging\MessagingException;
-use Ecotone\Modelling\Annotation\CommandHandler;
-use Ecotone\Modelling\Annotation\QueryHandler;
+use Ecotone\Modelling\Attribute\CommandHandler;
+use Ecotone\Modelling\Attribute\QueryHandler;
 use Enqueue\Dbal\DbalConnectionFactory;
 use Enqueue\Dbal\ManagerRegistryConnectionFactory;
 use InvalidArgumentException;
