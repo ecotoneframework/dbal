@@ -3,11 +3,11 @@
 
 namespace Test\Ecotone\Dbal\Fixture\AsynchronousChannelTransaction;
 
-use Ecotone\Messaging\Annotation\Asynchronous;
-use Ecotone\Messaging\Annotation\ServiceActivator;
+use Ecotone\Messaging\Attribute\Asynchronous;
+use Ecotone\Messaging\Attribute\ServiceActivator;
 use Ecotone\Messaging\MessagingException;
-use Ecotone\Modelling\Annotation\CommandHandler;
-use Ecotone\Modelling\Annotation\QueryHandler;
+use Ecotone\Modelling\Attribute\CommandHandler;
+use Ecotone\Modelling\Attribute\QueryHandler;
 use InvalidArgumentException;
 
 class OrderService
@@ -16,10 +16,8 @@ class OrderService
 
     private int $callCounter = 0;
 
-    /**
-     * @Asynchronous("orders")
-     * @CommandHandler(endpointId="orderRegister", inputChannelName="order.register")
-     */
+    #[CommandHandler("order.register", "orderRegister")]
+    #[Asynchronous("orders")]
     public function register(string $order, OrderRegisteringGateway $orderRegisteringGateway): void
     {
         $orderRegisteringGateway->place($order);
@@ -32,18 +30,14 @@ class OrderService
         $this->callCounter = 0;
     }
 
-    /**
-     * @Asynchronous("processOrders")
-     * @CommandHandler(endpointId="placeOrderEndpoint", inputChannelName="placeOrder")
-     */
+    #[Asynchronous("processOrders")]
+    #[CommandHandler("placeOrder", "placeOrderEndpoint")]
     public function placeOrder(string $order) : void
     {
         $this->orders[] = $order;
     }
 
-    /**
-     * @QueryHandler(inputChannelName="order.getRegistered")
-     */
+    #[QueryHandler("order.getRegistered")]
     public function getRegistered() : array
     {
         return $this->orders;

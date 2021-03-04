@@ -1,12 +1,13 @@
 <?php
 
-namespace Ecotone\Dbal\DbalTransaction;
+namespace Ecotone\Dbal\ObjectManager;
 
 use Ecotone\AnnotationFinder\AnnotationFinder;
 use Ecotone\Dbal\Configuration\DbalConfiguration;
-use Ecotone\Messaging\Annotation\AsynchronousRunningEndpoint;
-use Ecotone\Messaging\Annotation\ModuleAnnotation;
-use Ecotone\Messaging\Annotation\PollableEndpoint;
+use Ecotone\Messaging\Attribute\AsynchronousRunningEndpoint;
+use Ecotone\Messaging\Attribute\ConsoleCommand;
+use Ecotone\Messaging\Attribute\ModuleAnnotation;
+use Ecotone\Messaging\Attribute\PollableEndpoint;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
 use Ecotone\Messaging\Config\Annotation\AnnotationRegistrationService;
 use Ecotone\Messaging\Config\Configuration;
@@ -16,10 +17,8 @@ use Ecotone\Messaging\Precedence;
 use Ecotone\Modelling\CommandBus;
 use Enqueue\Dbal\DbalConnectionFactory;
 
-/**
- * @ModuleAnnotation()
- */
-class DbalTransactionConfiguration implements AnnotationModule
+#[ModuleAnnotation]
+class ObjectManagerModule implements AnnotationModule
 {
     private function __construct()
     {
@@ -28,17 +27,9 @@ class DbalTransactionConfiguration implements AnnotationModule
     /**
      * @inheritDoc
      */
-    public static function create(AnnotationFinder $annotationRegistrationService)
+    public static function create(AnnotationFinder $annotationRegistrationService): static
     {
         return new self();
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function getName(): string
-    {
-        return "DbalTransactionModule";
     }
 
     /**
@@ -47,7 +38,7 @@ class DbalTransactionConfiguration implements AnnotationModule
     public function prepare(Configuration $configuration, array $extensionObjects, ModuleReferenceSearchService $moduleReferenceSearchService): void
     {
         $connectionFactories = [DbalConnectionFactory::class];
-        $pointcut            = "@(" . DbalTransaction::class . ")";
+        $pointcut = "(" . AsynchronousRunningEndpoint::class . ")";
 
         $dbalConfiguration = DbalConfiguration::createWithDefaults();
         foreach ($extensionObjects as $extensionObject) {
@@ -56,11 +47,8 @@ class DbalTransactionConfiguration implements AnnotationModule
             }
         }
 
-        if ($dbalConfiguration->isDefaultTransactionOnAsynchronousEndpoints()) {
-            $pointcut .= "||@(" . AsynchronousRunningEndpoint::class . ")";
-        }
-        if ($dbalConfiguration->isDefaultTransactionOnCommandBus()) {
-            $pointcut .= "||" . CommandBus::class . "";
+        if (!$dbalConfiguration->isClearObjectManagerOnAsynchronousEndpoints()) {
+            return;
         }
         if ($dbalConfiguration->getDefaultConnectionReferenceNames()) {
             $connectionFactories = $dbalConfiguration->getDefaultConnectionReferenceNames();
@@ -69,12 +57,12 @@ class DbalTransactionConfiguration implements AnnotationModule
         $configuration
             ->requireReferences($connectionFactories)
             ->registerAroundMethodInterceptor(
-                AroundInterceptorReference::createWithObjectBuilder(
-                    DbalTransactionInterceptor::class,
-                    new DbalTransactionInterceptorBuilder($connectionFactories),
+                AroundInterceptorReference::createWithDirectObject(
+                    new ObjectManagerInterceptor($connectionFactories),
                     "transactional",
-                    Precedence::DATABASE_TRANSACTION_PRECEDENCE,
-                    $pointcut
+                    Precedence::DATABASE_TRANSACTION_PRECEDENCE + 1,
+                    $pointcut,
+                    []
                 )
             );
     }
@@ -85,6 +73,11 @@ class DbalTransactionConfiguration implements AnnotationModule
     public function canHandle($extensionObject): bool
     {
         return $extensionObject instanceof DbalConfiguration;
+    }
+
+    public function getModuleExtensions(array $serviceExtensions): array
+    {
+        return [];
     }
 
     /**

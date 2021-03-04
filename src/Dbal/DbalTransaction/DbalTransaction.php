@@ -4,9 +4,7 @@ namespace Ecotone\Dbal\DbalTransaction;
 
 use Enqueue\Dbal\DbalConnectionFactory;
 
-/**
- * @Annotation
- */
+#[\Attribute]
 class DbalTransaction
 {
     public $connectionReferenceNames = [DbalConnectionFactory::class];

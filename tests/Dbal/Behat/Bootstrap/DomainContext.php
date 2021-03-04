@@ -5,10 +5,11 @@ namespace Test\Ecotone\Dbal\Behat\Bootstrap;
 use Behat\Behat\Tester\Exception\PendingException;
 use Behat\Behat\Context\Context;
 use Doctrine\Common\Annotations\AnnotationException;
+use Ecotone\Dbal\Recoverability\DbalDeadLetter;
 use Ecotone\Dbal\Recoverability\DeadLetterGateway;
 use Ecotone\Lite\EcotoneLiteConfiguration;
 use Ecotone\Lite\InMemoryPSRContainer;
-use Ecotone\Messaging\Config\ApplicationConfiguration;
+use Ecotone\Messaging\Config\ServiceConfiguration;
 use Ecotone\Messaging\Config\ConfigurationException;
 use Ecotone\Messaging\Config\ConfiguredMessagingSystem;
 use Ecotone\Messaging\Conversion\MediaType;
@@ -38,12 +39,6 @@ class DomainContext extends TestCase implements Context
 
     /**
      * @Given I active messaging for namespace :namespace
-     * @param string $namespace
-     * @throws AnnotationException
-     * @throws ConfigurationException
-     * @throws MessagingException
-     * @throws InvalidArgumentException
-     * @throws ReflectionException
      */
     public function iActiveMessagingForNamespace(string $namespace)
     {
@@ -82,16 +77,35 @@ SELECT EXISTS (
 SQL
         )->fetchOne();
         if ($isTableExists) {
-            $connection->executeUpdate("DELETE FROM enqueue");
+            $this->deleteFromTableExists("enqueue", $connection);
+            $this->deleteFromTableExists(OrderService::ORDER_TABLE, $connection);
+            $this->deleteFromTableExists(DbalDeadLetter::DEFAULT_DEAD_LETTER_TABLE, $connection);
         }
 
         self::$messagingSystem            = EcotoneLiteConfiguration::createWithConfiguration(
             __DIR__ . "/../../../../",
             InMemoryPSRContainer::createFromObjects(array_merge($objects, ["managerRegistry" => $managerRegistryConnectionFactory, DbalConnectionFactory::class => $managerRegistryConnectionFactory])),
-            ApplicationConfiguration::createWithDefaults()
+            ServiceConfiguration::createWithDefaults()
                 ->withNamespaces([$namespace])
-                ->withCacheDirectoryPath(sys_get_temp_dir() . DIRECTORY_SEPARATOR . Uuid::uuid4()->toString())
+                ->withCacheDirectoryPath(sys_get_temp_dir() . DIRECTORY_SEPARATOR . Uuid::uuid4()->toString()),
+            []
         );
+    }
+
+    private function deleteFromTableExists(string $tableName, \Doctrine\DBAL\Connection $connection) : void
+    {
+        $doesExists = $connection->executeQuery(
+            <<<SQL
+SELECT EXISTS (
+   SELECT FROM information_schema.tables 
+   WHERE  table_name   = :tableName
+   );
+SQL, ["tableName" => $tableName]
+        )->fetchOne();
+
+        if ($doesExists) {
+            $connection->executeUpdate("DELETE FROM " . $tableName);
+        }
     }
 
     /**
@@ -100,7 +114,7 @@ SQL
      */
     public function iActiveReceiver(string $receiverName)
     {
-        self::$messagingSystem->runSeparatelyRunningEndpointBy($receiverName);
+        self::$messagingSystem->runAsynchronouslyRunningEndpoint($receiverName);
     }
 
     /**
@@ -110,7 +124,7 @@ SQL
     {
         $this->assertEquals(
             [],
-            $this->getQueryBus()->convertAndSend("order.getOrders", MediaType::APPLICATION_X_PHP, [])
+            $this->getQueryBus()->sendWithRouting("order.getOrders", [])
         );
     }
 
@@ -133,7 +147,7 @@ SQL
         $commandBus = self::$messagingSystem->getGatewayByName(CommandBus::class);
 
         try {
-            $commandBus->convertAndSend("order.register", MediaType::APPLICATION_X_PHP, $order);
+            $commandBus->sendWithRouting("order.register", $order);
         }catch (\InvalidArgumentException $e) {}
     }
 
@@ -153,7 +167,7 @@ SQL
      */
     public function iCallPollableEndpoint(string $consumerId)
     {
-        self::$messagingSystem->runSeparatelyRunningEndpointBy($consumerId);
+        self::$messagingSystem->runAsynchronouslyRunningEndpoint($consumerId);
     }
 
     /**
@@ -202,7 +216,7 @@ SQL
     {
         $this->assertEquals(
             $amount,
-            count($this->getQueryBus()->convertAndSend("order.getRegistered", MediaType::APPLICATION_X_PHP, []))
+            count($this->getQueryBus()->sendWithRouting("order.getRegistered", []))
         );
     }
 }

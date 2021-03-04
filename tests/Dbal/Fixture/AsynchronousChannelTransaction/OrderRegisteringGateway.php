@@ -2,12 +2,10 @@
 
 namespace Test\Ecotone\Dbal\Fixture\AsynchronousChannelTransaction;
 
-use Ecotone\Messaging\Annotation\MessageGateway;
+use Ecotone\Messaging\Attribute\MessageGateway;
 
 interface OrderRegisteringGateway
 {
-    /**
-     * @MessageGateway(requestChannel="placeOrder")
-     */
+    #[MessageGateway("placeOrder")]
     public function place(string $order): void;
 }

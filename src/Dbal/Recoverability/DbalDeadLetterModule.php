@@ -5,42 +5,32 @@ namespace Ecotone\Dbal\Recoverability;
 
 use Ecotone\AnnotationFinder\AnnotationFinder;
 use Ecotone\Dbal\Configuration\DbalConfiguration;
-use Ecotone\Messaging\Annotation\ModuleAnnotation;
+use Ecotone\Messaging\Attribute\ModuleAnnotation;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
-use Ecotone\Messaging\Config\Annotation\ModuleConfiguration\OneTimeCommandModule;
+use Ecotone\Messaging\Config\Annotation\ModuleConfiguration\ConsoleCommandModule;
 use Ecotone\Messaging\Config\Configuration;
 use Ecotone\Messaging\Config\ModuleReferenceSearchService;
-use Ecotone\Messaging\Config\OneTimeCommandConfiguration;
+use Ecotone\Messaging\Config\ConsoleCommandConfiguration;
 use Ecotone\Messaging\Handler\Gateway\GatewayProxyBuilder;
 use Ecotone\Messaging\Handler\Gateway\ParameterToMessageConverter\GatewayHeaderBuilder;
 use Enqueue\Dbal\DbalConnectionFactory;
 
-/**
- * @ModuleAnnotation()
- */
+#[ModuleAnnotation]
 class DbalDeadLetterModule implements AnnotationModule
 {
-    const LIST_COMMAND_NAME            = "ecotone:dbal:deadletter:list";
-    const SHOW_COMMAND_NAME       = "ecotone:dbal:deadletter:show";
-    const REPLAY_COMMAND_NAME     = "ecotone:dbal:deadletter:replay";
-    const REPLAY_ALL_COMMAND_NAME = "ecotone:dbal:deadletter:replayAll";
-    const DELETE_COMMAND_NAME     = "ecotone:dbal:deadletter:delete";
-    const HELP_COMMAND_NAME = "ecotone:dbal:deadletter:help";
+    const HELP_COMMAND_NAME = "ecotone:deadletter:help";
+    const LIST_COMMAND_NAME            = "ecotone:deadletter:list";
+    const SHOW_COMMAND_NAME       = "ecotone:deadletter:show";
+    const REPLAY_COMMAND_NAME     = "ecotone:deadletter:replay";
+    const REPLAY_ALL_COMMAND_NAME = "ecotone:deadletter:replayAll";
+    const DELETE_COMMAND_NAME     = "ecotone:deadletter:delete";
 
     /**
      * @inheritDoc
      */
-    public static function create(AnnotationFinder $annotationRegistrationService)
+    public static function create(AnnotationFinder $annotationRegistrationService): static
     {
         return new self();
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function getName(): string
-    {
-        return "dbalRecoverabilityModule";
     }
 
     /**
@@ -141,13 +131,18 @@ class DbalDeadLetterModule implements AnnotationModule
         return [];
     }
 
+    public function getModuleExtensions(array $serviceExtensions): array
+    {
+        return [];
+    }
+
     private function registerOneTimeCommand(string $methodName, string $commandName, Configuration $configuration): void
     {
-        list($messageHandlerBuilder, $oneTimeCommandConfiguration) = OneTimeCommandModule::prepareOneTimeCommand(
-            DbalDeadLetterConsoleCommand::class, $methodName, $commandName
+        list($messageHandlerBuilder, $oneTimeCommandConfiguration) = ConsoleCommandModule::prepareConsoleCommandForDirectObject(
+            new DbalDeadLetterConsoleCommand(), $methodName, $commandName, true
         );
         $configuration
             ->registerMessageHandler($messageHandlerBuilder)
-            ->registerOneTimeCommand($oneTimeCommandConfiguration);
+            ->registerConsoleCommand($oneTimeCommandConfiguration);
     }
 }

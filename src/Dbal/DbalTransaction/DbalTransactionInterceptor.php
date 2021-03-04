@@ -18,25 +18,20 @@ use Enqueue\Dbal\DbalContext;
 class DbalTransactionInterceptor
 {
     /**
-     * @var ReferenceSearchService
-     */
-    private $referenceSearchService;
-    /**
      * @var string[]
      */
     private $connectionReferenceNames;
 
-    public function __construct(ReferenceSearchService $referenceSearchService, array $connectionReferenceNames)
+    public function __construct(array $connectionReferenceNames)
     {
-        $this->referenceSearchService = $referenceSearchService;
         $this->connectionReferenceNames = $connectionReferenceNames;
     }
 
-    public function transactional(MethodInvocation $methodInvocation, ?DbalTransaction $DbalTransaction)
+    public function transactional(MethodInvocation $methodInvocation, ?DbalTransaction $DbalTransaction, ReferenceSearchService $referenceSearchService)
     {;
         /** @var Connection[] $connections */
-        $possibleConnections = array_map(function(string $connectionReferenceName){
-            $connectionFactory = CachedConnectionFactory::createFor(new DbalReconnectableConnectionFactory($this->referenceSearchService->get($connectionReferenceName)));
+        $possibleConnections = array_map(function(string $connectionReferenceName) use ($referenceSearchService) {
+            $connectionFactory = CachedConnectionFactory::createFor(new DbalReconnectableConnectionFactory($referenceSearchService->get($connectionReferenceName)));
 
             /** @var DbalContext $context */
             $context = $connectionFactory->createContext();
@@ -64,7 +59,7 @@ class DbalTransactionInterceptor
             }
         }catch (\Throwable $exception) {
             foreach ($connections as $connection) {
-                try { $connection->rollBack(); }catch (\Throwable $failureRollBack) {}
+                try { $connection->rollBack(); }catch (\Throwable) {}
             }
 
             throw $exception;

@@ -46,7 +46,7 @@ class DbalConnectionManagerRegistryWrapper implements ManagerRegistry
 
     public function getManagers()
     {
-        // TODO: Implement getManagers() method.
+        return [];
     }
 
     public function resetManager($name = null)

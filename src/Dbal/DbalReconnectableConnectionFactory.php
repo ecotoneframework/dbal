@@ -16,12 +16,9 @@ use ReflectionClass;
 
 class DbalReconnectableConnectionFactory implements ReconnectableConnectionFactory
 {
-    /**
-     * @var ConnectionFactory
-     */
-    private $connectionFactory;
+    private DbalConnectionFactory|ManagerRegistryConnectionFactory $connectionFactory;
 
-    public function __construct(ConnectionFactory $dbalConnectionFactory)
+    public function __construct(DbalConnectionFactory|ManagerRegistryConnectionFactory $dbalConnectionFactory)
     {
         $this->connectionFactory = $dbalConnectionFactory;
     }
@@ -53,31 +50,58 @@ class DbalReconnectableConnectionFactory implements ReconnectableConnectionFacto
 
     public function reconnect(): void
     {
-        $reflectionClass = new ReflectionClass($this->connectionFactory);
-        if ($this->connectionFactory instanceof ManagerRegistryConnectionFactory) {
-            $registry = $reflectionClass->getProperty("registry");
-            $registry->setAccessible(true);
-            $config = $reflectionClass->getProperty("config");
-            $config->setAccessible(true);
-
-            $connectionName = $config->getValue($this->connectionFactory)["connection_name"];
-            /** @var ManagerRegistry $registry */
-            $registry = $registry->getValue($this->connectionFactory);
+        $connectionFactory = $this->connectionFactory;
+        if ($connectionFactory instanceof ManagerRegistryConnectionFactory) {
+            list($registry, $connectionName) = self::getManagerRegistryAndConnectionName($connectionFactory);
             /** @var Connection $connection */
             $connection = $registry->getConnection($connectionName);
-
-            $connection->close();
-            $connection->connect();
         }else {
+            $reflectionClass   = new ReflectionClass($connectionFactory);
             $connectionProperty = $reflectionClass->getProperty("connection");
             $connectionProperty->setAccessible(true);
             /** @var Connection $connection */
-            $connection = $connectionProperty->getValue($this->connectionFactory);
-            if ($connection) {
-                $connection->close();
-                $connection->connect();
-                $connectionProperty->setValue($this->connectionFactory, null);
-            }
+            $connection = $connectionProperty->getValue($connectionFactory);
         }
+
+        if ($connection) {
+            $connection->close();
+            $connection->connect();
+        }
+    }
+
+    public function getConnection() : Connection
+    {
+        $connectionFactory = $this->connectionFactory;
+        if ($connectionFactory instanceof ManagerRegistryConnectionFactory) {
+            list($registry, $connectionName) = self::getManagerRegistryAndConnectionName($connectionFactory);
+            /** @var Connection $connection */
+            return $registry->getConnection($connectionName);
+        }else {
+            $reflectionClass   = new ReflectionClass($connectionFactory);
+            $method = $reflectionClass->getMethod("establishConnection");
+            $method->setAccessible(true);
+            $method->invoke($connectionFactory);
+
+            $connectionProperty = $reflectionClass->getProperty("connection");
+            $connectionProperty->setAccessible(true);
+            /** @var Connection $connection */
+            return $connectionProperty->getValue($connectionFactory);
+        }
+    }
+
+    public static function getManagerRegistryAndConnectionName(ManagerRegistryConnectionFactory $connectionFactory): array
+    {
+        $reflectionClass   = new ReflectionClass($connectionFactory);
+
+        $registry = $reflectionClass->getProperty("registry");
+        $registry->setAccessible(true);
+        $config = $reflectionClass->getProperty("config");
+        $config->setAccessible(true);
+
+        $connectionName = $config->getValue($connectionFactory)["connection_name"];
+        /** @var ManagerRegistry $registry */
+        $registry = $registry->getValue($connectionFactory);
+
+        return array($registry, $connectionName);
     }
 }

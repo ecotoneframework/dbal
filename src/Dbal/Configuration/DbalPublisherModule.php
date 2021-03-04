@@ -5,10 +5,10 @@ namespace Ecotone\Dbal\Configuration;
 
 use Ecotone\AnnotationFinder\AnnotationFinder;
 use Ecotone\Dbal\DbalOutboundChannelAdapterBuilder;
-use Ecotone\Messaging\Annotation\ModuleAnnotation;
+use Ecotone\Messaging\Attribute\ModuleAnnotation;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
 use Ecotone\Messaging\Config\Annotation\AnnotationRegistrationService;
-use Ecotone\Messaging\Config\ApplicationConfiguration;
+use Ecotone\Messaging\Config\ServiceConfiguration;
 use Ecotone\Messaging\Config\Configuration;
 use Ecotone\Messaging\Config\ConfigurationException;
 use Ecotone\Messaging\Config\ModuleReferenceSearchService;
@@ -21,26 +21,15 @@ use Ecotone\Messaging\Handler\Gateway\ParameterToMessageConverter\GatewayPayload
 use Ecotone\Messaging\MessageHeaders;
 use Ecotone\Messaging\MessagePublisher;
 
-/**
- * @author Dariusz Gafka <dgafka.mail@gmail.com>
- * @ModuleAnnotation()
- */
+#[ModuleAnnotation]
 class DbalPublisherModule implements AnnotationModule
 {
     /**
      * @inheritDoc
      */
-    public static function create(AnnotationFinder $annotationRegistrationService)
+    public static function create(AnnotationFinder $annotationRegistrationService): static
     {
         return new self();
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function getName(): string
-    {
-        return "dbalPublisherModule";
     }
 
     /**
@@ -49,10 +38,10 @@ class DbalPublisherModule implements AnnotationModule
     public function prepare(Configuration $configuration, array $extensionObjects, ModuleReferenceSearchService $moduleReferenceSearchService): void
     {
         $registeredReferences = [];
-        /** @var ApplicationConfiguration $applicationConfiguration */
+        /** @var ServiceConfiguration $applicationConfiguration */
         $applicationConfiguration = null;
         foreach ($extensionObjects as $extensionObject) {
-            if ($extensionObject instanceof ApplicationConfiguration) {
+            if ($extensionObject instanceof ServiceConfiguration) {
                 $applicationConfiguration = $extensionObject;
                 break;
             }
@@ -128,7 +117,12 @@ class DbalPublisherModule implements AnnotationModule
     {
         return
             $extensionObject instanceof DbalMessagePublisherConfiguration
-            || $extensionObject instanceof ApplicationConfiguration;
+            || $extensionObject instanceof ServiceConfiguration;
+    }
+
+    public function getModuleExtensions(array $serviceExtensions): array
+    {
+        return [];
     }
 
     /**

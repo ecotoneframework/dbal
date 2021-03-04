@@ -7,7 +7,10 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Schema\Table;
 use Doctrine\DBAL\Types\Type;
 use Doctrine\DBAL\Types\Types;
+use Ecotone\Dbal\DbalReconnectableConnectionFactory;
+use Ecotone\Enqueue\CachedConnectionFactory;
 use Ecotone\Messaging\Handler\Processor\MethodInvoker\MethodInvocation;
+use Ecotone\Messaging\Handler\ReferenceSearchService;
 use Ecotone\Messaging\MessageHeaders;
 use Ecotone\Messaging\Scheduling\Clock;
 use Enqueue\Dbal\DbalContext;
@@ -21,39 +24,31 @@ use Interop\Queue\Exception\Exception;
  */
 class DeduplicationInterceptor
 {
-    /**
-     * @var ConnectionFactory
-     */
-    private $connectionFactory;
+    private bool $isInitialized = false;
+    private Clock $clock;
+    private int $minimumTimeToRemoveMessageInMilliseconds;
+    private string $connectionReferenceName;
 
-    private $isInitialized = false;
-    /**
-     * @var Clock
-     */
-    private $clock;
-    /**
-     * @var int
-     */
-    private $minimumTimeToRemoveMessageInMilliseconds;
-
-    public function __construct(ConnectionFactory $connectionFactory, Clock $clock, int $minimumTimeToRemoveMessageInMilliseconds)
+    public function __construct(string $connectionReferenceName, Clock $clock, int $minimumTimeToRemoveMessageInMilliseconds)
     {
-        $this->connectionFactory = $connectionFactory;
         $this->clock = $clock;
         $this->minimumTimeToRemoveMessageInMilliseconds = $minimumTimeToRemoveMessageInMilliseconds;
+        $this->connectionReferenceName = $connectionReferenceName;
     }
 
-    public function deduplicate(MethodInvocation $methodInvocation, $payload, array $headers)
+    public function deduplicate(MethodInvocation $methodInvocation, $payload, array $headers, ReferenceSearchService $referenceSearchService)
     {
+        $connectionFactory = CachedConnectionFactory::createFor(new DbalReconnectableConnectionFactory($referenceSearchService->get($this->connectionReferenceName)));
+
         if (!$this->isInitialized) {
-            $this->createDataBaseTable();
+            $this->createDataBaseTable($connectionFactory);
             $this->isInitialized = true;
         }
-        $this->removeExpiredMessages();
+        $this->removeExpiredMessages($connectionFactory);
         $messageId = $headers[MessageHeaders::MESSAGE_ID];
         $consumerEndpointId = $headers[MessageHeaders::CONSUMER_ENDPOINT_ID];
 
-        $select = $this->getConnection()->createQueryBuilder()
+        $select = $this->getConnection($connectionFactory)->createQueryBuilder()
             ->select('message_id')
             ->from($this->getTableName())
             ->andWhere('message_id = :messageId')
@@ -69,14 +64,14 @@ class DeduplicationInterceptor
         }
 
         $result = $methodInvocation->proceed();
-        $this->insertHandledMessage($headers);
+        $this->insertHandledMessage($connectionFactory, $headers);
 
         return $result;
     }
 
-    private function removeExpiredMessages(): void
+    private function removeExpiredMessages(ConnectionFactory $connectionFactory): void
     {
-        $this->getConnection()->createQueryBuilder()
+        $this->getConnection($connectionFactory)->createQueryBuilder()
             ->delete($this->getTableName())
             ->andWhere('(:now - handled_at) >= :minimumTimeToRemoveTheMessage')
             ->setParameter(':now', $this->clock->unixTimeInMilliseconds(), Types::BIGINT)
@@ -84,9 +79,9 @@ class DeduplicationInterceptor
             ->execute();
     }
 
-    private function insertHandledMessage(array $headers) : void
+    private function insertHandledMessage(ConnectionFactory $connectionFactory, array $headers) : void
     {
-        $rowsAffected = $this->getConnection()->insert(
+        $rowsAffected = $this->getConnection($connectionFactory)->insert(
             $this->getTableName(),
             [
                 'message_id' => $headers[MessageHeaders::MESSAGE_ID],
@@ -110,9 +105,9 @@ class DeduplicationInterceptor
         return "ecotone_outbox";
     }
 
-    private function createDataBaseTable(): void
+    private function createDataBaseTable(ConnectionFactory $connectionFactory): void
     {
-        $sm = $this->getConnection()->getSchemaManager();
+        $sm = $this->getConnection($connectionFactory)->getSchemaManager();
 
         if ($sm->tablesExist([$this->getTableName()])) {
             return;
@@ -130,10 +125,10 @@ class DeduplicationInterceptor
         $sm->createTable($table);
     }
 
-    private function getConnection(): Connection
+    private function getConnection(ConnectionFactory $connectionFactory): Connection
     {
         /** @var DbalContext $context */
-        $context = $this->connectionFactory->createContext();
+        $context = $connectionFactory->createContext();
 
         return $context->getDbalConnection();
     }

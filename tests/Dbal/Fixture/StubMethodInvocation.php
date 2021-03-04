@@ -9,13 +9,12 @@ use Ecotone\Messaging\Handler\Processor\MethodInvoker\MethodInvocation;
 
 class StubMethodInvocation implements MethodInvocation
 {
-    /**
-     * @var integer
-     */
-    private $calledTimes = 0;
+    private int $calledTimes = 0;
+    private $returnData;
 
-    private function __construct()
+    private function __construct($returnData = null)
     {
+        $this->returnData = $returnData;
     }
 
     public static function create() : self
@@ -31,6 +30,8 @@ class StubMethodInvocation implements MethodInvocation
     public function proceed()
     {
         $this->calledTimes++;
+
+        return $this->returnData;
     }
 
     public function getObjectToInvokeOn()

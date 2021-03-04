@@ -131,7 +131,7 @@ class DbalDeadLetterBuilder extends InputOutputMessageHandlerBuilder
         return $this->getInputMessageChannelName() . ".endpoint";
     }
 
-    public function withEndpointId(string $endpointId)
+    public function withEndpointId(string $endpointId): self
     {
         return $this;
     }

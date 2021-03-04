@@ -1,27 +1,26 @@
 <?php
 
-namespace Ecotone\Dbal\Deduplication;
+namespace Ecotone\Dbal\DbalTransaction;
 
 use Ecotone\AnnotationFinder\AnnotationFinder;
 use Ecotone\Dbal\Configuration\DbalConfiguration;
-use Ecotone\Dbal\DbalReconnectableConnectionFactory;
-use Ecotone\Enqueue\CachedConnectionFactory;
 use Ecotone\Messaging\Attribute\AsynchronousRunningEndpoint;
+use Ecotone\Messaging\Attribute\ConsoleCommand;
 use Ecotone\Messaging\Attribute\ModuleAnnotation;
+use Ecotone\Messaging\Attribute\PollableEndpoint;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
+use Ecotone\Messaging\Config\Annotation\AnnotationRegistrationService;
 use Ecotone\Messaging\Config\Configuration;
-use Ecotone\Messaging\Config\ConfigurationException;
 use Ecotone\Messaging\Config\ModuleReferenceSearchService;
+use Ecotone\Messaging\Gateway\ConsoleCommandRunner;
 use Ecotone\Messaging\Handler\Processor\MethodInvoker\AroundInterceptorReference;
 use Ecotone\Messaging\Precedence;
-use Ecotone\Messaging\Scheduling\EpochBasedClock;
+use Ecotone\Modelling\CommandBus;
 use Enqueue\Dbal\DbalConnectionFactory;
 
 #[ModuleAnnotation]
-class DeduplicationModule implements AnnotationModule
+class DbalTransactionModule implements AnnotationModule
 {
-    const REMOVE_MESSAGE_AFTER_7_DAYS = 1000 * 60 * 60 * 24 * 7;
-
     private function __construct()
     {
     }
@@ -39,34 +38,37 @@ class DeduplicationModule implements AnnotationModule
      */
     public function prepare(Configuration $configuration, array $extensionObjects, ModuleReferenceSearchService $moduleReferenceSearchService): void
     {
-        $isDeduplicatedEnabled = false;
-        $connectionFactory     = DbalConnectionFactory::class;
+        $connectionFactories = [DbalConnectionFactory::class];
+        $pointcut            = "(" . DbalTransaction::class . ")";
+
+        $dbalConfiguration = DbalConfiguration::createWithDefaults();
         foreach ($extensionObjects as $extensionObject) {
             if ($extensionObject instanceof DbalConfiguration) {
-                if (!$extensionObject->isDeduplicatedEnabled()) {
-                    return;
-                }
-
-                $connectionFactory     = $extensionObject->getDeduplicationConnectionReference();
-                $isDeduplicatedEnabled = true;
+                $dbalConfiguration = $extensionObject;
             }
         }
 
-        if (!$isDeduplicatedEnabled) {
-            return;
+        if ($dbalConfiguration->isTransactionOnAsynchronousEndpoints()) {
+            $pointcut .= "||(" . AsynchronousRunningEndpoint::class . ")";
+        }
+        if ($dbalConfiguration->isTransactionOnCommandBus()) {
+            $pointcut .= "||(" . CommandBus::class . ")";
+        }
+        if ($dbalConfiguration->isTransactionOnConsoleCommands()) {
+            $pointcut .= "||(" . ConsoleCommand::class . ")";
+        }
+        if ($dbalConfiguration->getDefaultConnectionReferenceNames()) {
+            $connectionFactories = $dbalConfiguration->getDefaultConnectionReferenceNames();
         }
 
         $configuration
+            ->requireReferences($connectionFactories)
             ->registerAroundMethodInterceptor(
                 AroundInterceptorReference::createWithDirectObject(
-                    new DeduplicationInterceptor(
-                        $connectionFactory,
-                        new EpochBasedClock(),
-                        self::REMOVE_MESSAGE_AFTER_7_DAYS
-                    ),
-                    "deduplicate",
-                    Precedence::DATABASE_TRANSACTION_PRECEDENCE + 100,
-                    AsynchronousRunningEndpoint::class,
+                    new DbalTransactionInterceptor($connectionFactories),
+                    "transactional",
+                    Precedence::DATABASE_TRANSACTION_PRECEDENCE,
+                    $pointcut,
                     []
                 )
             );

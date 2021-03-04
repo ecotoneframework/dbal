@@ -3,26 +3,15 @@
 
 namespace Test\Ecotone\Dbal\Fixture\AsynchronousChannelTransaction;
 
-use Ecotone\Amqp\AmqpBackedMessageChannelBuilder;
-use Ecotone\Amqp\Configuration\AmqpConfiguration;
 use Ecotone\Dbal\Configuration\DbalConfiguration;
 use Ecotone\Dbal\DbalBackedMessageChannelBuilder;
-use Ecotone\Messaging\Annotation\ApplicationContext;
-use Ecotone\Messaging\Annotation\Extension;
+use Ecotone\Messaging\Attribute\ServiceContext;
 use Ecotone\Messaging\Endpoint\PollingMetadata;
 
-/**
- * Class ChannelConfiguration
- * @package Test\Ecotone\Amqp\Fixture\Order
- * @author Dariusz Gafka <dgafka.mail@gmail.com>
- * @ApplicationContext()
- */
 class ChannelConfiguration
 {
-    /**
-     * @Extension()
-     */
-    public function registerCommandChannel() : array
+    #[ServiceContext]
+    public function registerCommandChannel(): array
     {
         return [
             DbalBackedMessageChannelBuilder::create("orders", "managerRegistry")
