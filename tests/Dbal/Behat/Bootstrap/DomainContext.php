@@ -114,7 +114,7 @@ SQL, ["tableName" => $tableName]
      */
     public function iActiveReceiver(string $receiverName)
     {
-        self::$messagingSystem->runAsynchronouslyRunningEndpoint($receiverName);
+        self::$messagingSystem->run($receiverName);
     }
 
     /**
@@ -167,7 +167,7 @@ SQL, ["tableName" => $tableName]
      */
     public function iCallPollableEndpoint(string $consumerId)
     {
-        self::$messagingSystem->runAsynchronouslyRunningEndpoint($consumerId);
+        self::$messagingSystem->run($consumerId);
     }
 
     /**
