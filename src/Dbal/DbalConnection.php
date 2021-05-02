@@ -11,14 +11,14 @@ class DbalConnection implements ManagerRegistry
 {
     private function __construct(private Connection $connection) {}
 
-    public static function fromConnectionFactory(DbalConnectionFactory $dbalConnectionFactory) : ManagerRegistryConnectionFactory
+    public static function fromConnectionFactory(DbalConnectionFactory $dbalConnectionFactory): ManagerRegistryConnectionFactory
     {
         return new ManagerRegistryConnectionFactory(new self($dbalConnectionFactory->createContext()->getDbalConnection()));
     }
 
-    public static function create(Connection $connection)
+    public static function create(Connection $connection): ManagerRegistryConnectionFactory
     {
-        return new self($connection);
+        return new ManagerRegistryConnectionFactory(new self($connection));
     }
 
     public function getDefaultConnectionName()
