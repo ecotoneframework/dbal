@@ -2,31 +2,23 @@
 
 namespace Test\Ecotone\Dbal\Behat\Bootstrap;
 
-use Behat\Behat\Tester\Exception\PendingException;
 use Behat\Behat\Context\Context;
-use Doctrine\Common\Annotations\AnnotationException;
+use Ecotone\Dbal\DbalConnection;
 use Ecotone\Dbal\Recoverability\DbalDeadLetter;
 use Ecotone\Dbal\Recoverability\DeadLetterGateway;
 use Ecotone\Lite\EcotoneLiteConfiguration;
 use Ecotone\Lite\InMemoryPSRContainer;
+use Ecotone\Messaging\Config\ConfiguredMessagingSystem;
 use Ecotone\Messaging\Config\MessagingSystemConfiguration;
 use Ecotone\Messaging\Config\ServiceConfiguration;
-use Ecotone\Messaging\Config\ConfigurationException;
-use Ecotone\Messaging\Config\ConfiguredMessagingSystem;
-use Ecotone\Messaging\Conversion\MediaType;
-use Ecotone\Messaging\MessagingException;
-use Ecotone\Messaging\Support\InvalidArgumentException;
 use Ecotone\Modelling\CommandBus;
 use Ecotone\Modelling\QueryBus;
 use Enqueue\Dbal\DbalConnectionFactory;
 use Enqueue\Dbal\ManagerRegistryConnectionFactory;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
-use ReflectionException;
-use Test\Ecotone\Dbal\DbalConnectionManagerRegistryWrapper;
 use Test\Ecotone\Dbal\Fixture\DeadLetter\OrderGateway;
 use Test\Ecotone\Dbal\Fixture\Transaction\OrderService;
-use Test\Ecotone\Modelling\Fixture\OrderAggregate\OrderErrorHandler;
 
 /**
  * Defines application features from the specific context.
@@ -67,7 +59,7 @@ class DomainContext extends TestCase implements Context
             }
         }
 
-        $managerRegistryConnectionFactory = new ManagerRegistryConnectionFactory(new DbalConnectionManagerRegistryWrapper(new DbalConnectionFactory(["dsn" => 'pgsql://ecotone:secret@database:5432/ecotone'])));
+        $managerRegistryConnectionFactory = DbalConnection::fromConnectionFactory(new DbalConnectionFactory(["dsn" => 'pgsql://ecotone:secret@database:5432/ecotone']));
         $connection = $managerRegistryConnectionFactory->createContext()->getDbalConnection();
         $isTableExists = $connection->executeQuery(
             <<<SQL

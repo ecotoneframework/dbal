@@ -64,6 +64,32 @@ class DbalBackedMessageChannelTest extends DbalMessagingTest
         $this->assertEquals(123, $receivedMessage->getHeaders()->get($headerName));
     }
 
+    public function test_sending_and_receiving_using_already_defined_connection()
+    {
+        $channelName = Uuid::uuid4()->toString();
+
+        /** @var PollableChannel $messageChannel */
+        $messageChannel = DbalBackedMessageChannelBuilder::create($channelName)
+            ->withReceiveTimeout(1)
+            ->build(InMemoryReferenceSearchService::createWith([
+                DbalConnectionFactory::class => $this->getConnectionFactory(true)
+            ]));
+
+        $payload = "some";
+        $headerName = "token";
+        $messageChannel->send(
+            MessageBuilder::withPayload($payload)
+                ->setHeader($headerName, 123)
+                ->build()
+        );
+
+        $receivedMessage = $messageChannel->receive();
+
+        $this->assertNotNull($receivedMessage, "Not received message");
+        $this->assertEquals($payload, $receivedMessage->getPayload(), "Payload of received is different that sent one");
+        $this->assertEquals(123, $receivedMessage->getHeaders()->get($headerName));
+    }
+
     public function test_reconnecting_on_disconnected_channel()
     {
         $connectionFactory = $this->getConnectionFactory();

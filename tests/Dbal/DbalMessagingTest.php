@@ -4,7 +4,7 @@
 namespace Test\Ecotone\Dbal;
 
 
-use Ecotone\Dbal\DbalReconnectableConnectionFactory;
+use Ecotone\Dbal\DbalConnection;
 use Ecotone\Messaging\Handler\InMemoryReferenceSearchService;
 use Enqueue\Dbal\DbalConnectionFactory;
 use Enqueue\Dbal\ManagerRegistryConnectionFactory;
@@ -27,9 +27,7 @@ abstract class DbalMessagingTest extends TestCase
             }
             $dbalConnectionFactory = new DbalConnectionFactory($dsn);
             $this->dbalConnectionFactory = $isRegistry
-                ? new ManagerRegistryConnectionFactory(
-                    new DbalConnectionManagerRegistryWrapper($dbalConnectionFactory)
-                )
+                ? DbalConnection::fromConnectionFactory($dbalConnectionFactory)
                 : $dbalConnectionFactory;
         }
 
