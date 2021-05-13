@@ -58,7 +58,7 @@ class DeduplicationModule implements AnnotationModule
 
         $configuration
             ->registerAroundMethodInterceptor(
-                AroundInterceptorReference::createWithDirectObject(
+                AroundInterceptorReference::createWithDirectObjectAndResolveConverters(
                     new DeduplicationInterceptor(
                         $connectionFactory,
                         new EpochBasedClock(),
@@ -66,8 +66,7 @@ class DeduplicationModule implements AnnotationModule
                     ),
                     "deduplicate",
                     Precedence::DATABASE_TRANSACTION_PRECEDENCE + 100,
-                    AsynchronousRunningEndpoint::class,
-                    []
+                    AsynchronousRunningEndpoint::class
                 )
             );
     }

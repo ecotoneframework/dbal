@@ -64,12 +64,11 @@ class DbalTransactionModule implements AnnotationModule
         $configuration
             ->requireReferences($connectionFactories)
             ->registerAroundMethodInterceptor(
-                AroundInterceptorReference::createWithDirectObject(
+                AroundInterceptorReference::createWithDirectObjectAndResolveConverters(
                     new DbalTransactionInterceptor($connectionFactories),
                     "transactional",
                     Precedence::DATABASE_TRANSACTION_PRECEDENCE,
-                    $pointcut,
-                    []
+                    $pointcut
                 )
             );
     }
