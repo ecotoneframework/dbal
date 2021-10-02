@@ -45,7 +45,7 @@ class DbalReconnectableConnectionFactory implements ReconnectableConnectionFacto
             return false;
         }
 
-        return !$context->getDbalConnection()->isConnected()  || !$context->getDbalConnection()->ping();
+        return !$context->getDbalConnection()->isConnected()  || (method_exists(Connection::class, "ping") && !$context->getDbalConnection()->ping());
     }
 
     public function reconnect(): void
