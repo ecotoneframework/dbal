@@ -106,7 +106,7 @@ class DbalDeadLetter
         $this->getConnection()->createQueryBuilder()
             ->delete($this->getTableName())
             ->andWhere('message_id = :messageId')
-            ->setParameter(':messageId', $messageId, Types::TEXT)
+            ->setParameter('messageId', $messageId, Types::TEXT)
             ->execute();
     }
 
