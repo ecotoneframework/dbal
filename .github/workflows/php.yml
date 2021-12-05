@@ -10,6 +10,19 @@ jobs:
         operating-system: [ ubuntu-latest ]
 #        operating-system: [ ubuntu-latest, windows-latest, macOS-latest ]
         php-versions: [ '8.0' ]
+    services:
+      database:
+        image: postgres
+        env:
+          POSTGRES_USER: ecotone
+          POSTGRES_PASSWORD: secret
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_DSN: pgsql://ecotone:secret@database:5432/ecotone
     steps:
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
