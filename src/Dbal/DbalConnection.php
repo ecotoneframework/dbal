@@ -4,6 +4,7 @@ namespace Ecotone\Dbal;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\Persistence\ManagerRegistry;
+use Ecotone\Messaging\Support\InvalidArgumentException;
 use Enqueue\Dbal\DbalConnectionFactory;
 use Enqueue\Dbal\ManagerRegistryConnectionFactory;
 
@@ -48,7 +49,7 @@ class DbalConnection implements ManagerRegistry
 
     public function getManager($name = null)
     {
-        // TODO: Implement getManager() method.
+        throw InvalidArgumentException::create("Method not supported");
     }
 
     public function getManagers()
@@ -58,22 +59,22 @@ class DbalConnection implements ManagerRegistry
 
     public function resetManager($name = null)
     {
-        // TODO: Implement resetManager() method.
+        throw InvalidArgumentException::create("Method not supported");
     }
 
     public function getAliasNamespace($alias)
     {
-        // TODO: Implement getAliasNamespace() method.
+        throw InvalidArgumentException::create("Method not supported");
     }
 
     public function getManagerNames()
     {
-        // TODO: Implement getManagerNames() method.
+        throw InvalidArgumentException::create("Method not supported");
     }
 
     public function getRepository($persistentObject, $persistentManagerName = null)
     {
-        // TODO: Implement getRepository() method.
+        throw InvalidArgumentException::create("Method not supported");
     }
 
     public function getManagerForClass($class)
