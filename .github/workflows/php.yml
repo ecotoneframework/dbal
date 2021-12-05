@@ -1,4 +1,4 @@
-name: Ecotone Framework
+name: Ecotone Dbal
 
 on: [push, pull_request]
 
