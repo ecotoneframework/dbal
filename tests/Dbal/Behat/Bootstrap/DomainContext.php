@@ -59,7 +59,7 @@ class DomainContext extends TestCase implements Context
             }
         }
 
-        $managerRegistryConnectionFactory = DbalConnection::fromConnectionFactory(new DbalConnectionFactory(["dsn" => 'pgsql://ecotone:secret@database:5432/ecotone']));
+        $managerRegistryConnectionFactory = DbalConnection::fromConnectionFactory(new DbalConnectionFactory(["dsn" => getenv("DATABASE_DSN") ? getenv("DATABASE_DSN") : null]));
         $connection = $managerRegistryConnectionFactory->createContext()->getDbalConnection();
         $isTableExists = $connection->executeQuery(
             <<<SQL
