@@ -34,7 +34,7 @@
     }
   },
   "require": {
-    "ecotone/enqueue": "1.6.1",
+    "ecotone/enqueue": "1.6.2",
     "enqueue/dbal": "^0.10.0"
   },
   "require-dev": {
