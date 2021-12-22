@@ -65,7 +65,7 @@ class DbalInboundChannelAdapterBuilder extends EnqueueInboundChannelAdapterBuild
 
     public function buildInboundChannelAdapter(ChannelResolver $channelResolver, ReferenceSearchService $referenceSearchService, PollingMetadata $pollingMetadata): DbalInboundChannelAdapter
     {
-        /** @var DbalConnectionFactory $connectionFactory */
+        /** @var DbalConnection $connectionFactory */
         $connectionFactory = $referenceSearchService->get($this->connectionReferenceName);
         /** @var ConversionService $conversionService */
         $conversionService = $referenceSearchService->get(ConversionService::REFERENCE_NAME);

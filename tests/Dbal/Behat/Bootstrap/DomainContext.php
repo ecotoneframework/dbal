@@ -2,6 +2,7 @@
 
 namespace Test\Ecotone\Dbal\Behat\Bootstrap;
 
+use Behat\Behat\Tester\Exception\PendingException;
 use Behat\Behat\Context\Context;
 use Ecotone\Dbal\DbalConnection;
 use Ecotone\Dbal\Recoverability\DbalDeadLetter;
@@ -18,7 +19,10 @@ use Enqueue\Dbal\ManagerRegistryConnectionFactory;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 use Test\Ecotone\Dbal\Fixture\DeadLetter\OrderGateway;
+use Test\Ecotone\Dbal\Fixture\ORM\RegisterPerson;
 use Test\Ecotone\Dbal\Fixture\Transaction\OrderService;
+use Doctrine\ORM\Tools\Setup;
+use Doctrine\ORM\EntityManager;
 
 /**
  * Defines application features from the specific context.
@@ -54,34 +58,60 @@ class DomainContext extends TestCase implements Context
                 ];
                 break;
             }
+            case "Test\Ecotone\Dbal\Fixture\ORM": {
+                $objects = [
+
+                ];
+                break;
+            }
             default: {
                 throw new \InvalidArgumentException("Namespace {$namespace} not yet implemented");
             }
         }
 
-        $managerRegistryConnectionFactory = DbalConnection::fromConnectionFactory(new DbalConnectionFactory(["dsn" => getenv("DATABASE_DSN") ? getenv("DATABASE_DSN") : null]));
-        $connection = $managerRegistryConnectionFactory->createContext()->getDbalConnection();
-        $isTableExists = $connection->executeQuery(
-            <<<SQL
-SELECT EXISTS (
-   SELECT FROM information_schema.tables 
-   WHERE  table_name   = 'enqueue'
-   );
-SQL
-        )->fetchOne();
-        if ($isTableExists) {
-            $this->deleteFromTableExists("enqueue", $connection);
+        $dsn = getenv("DATABASE_DSN") ? getenv("DATABASE_DSN") : null;
+        $connectionFactory = DbalConnection::fromConnectionFactory(new DbalConnectionFactory(["dsn" => $dsn]));
+        $connection = $connectionFactory->createContext()->getDbalConnection();
+        $enqueueTable = "enqueue";
+        if ($this->checkIfTableExists($connection, $enqueueTable)) {
+            $this->deleteFromTableExists($enqueueTable, $connection);
             $this->deleteFromTableExists(OrderService::ORDER_TABLE, $connection);
             $this->deleteFromTableExists(DbalDeadLetter::DEFAULT_DEAD_LETTER_TABLE, $connection);
         }
 
+        $rootProjectDirectoryPath = __DIR__ . "/../../../../";
         $serviceConfiguration = ServiceConfiguration::createWithDefaults()
             ->withNamespaces([$namespace])
             ->withCacheDirectoryPath(sys_get_temp_dir() . DIRECTORY_SEPARATOR . Uuid::uuid4()->toString());
         MessagingSystemConfiguration::cleanCache($serviceConfiguration->getCacheDirectoryPath());
+
+        switch ($namespace) {
+            case "Test\Ecotone\Dbal\Fixture\ORM": {
+                if (!$this->checkIfTableExists($connection, "persons")) {
+                    $connection->executeStatement(<<<SQL
+    CREATE TABLE persons (
+        person_id INTEGER PRIMARY KEY,
+        name VARCHAR(255)
+    )
+SQL);
+                }
+                $this->deleteFromTableExists("persons", $connection);
+
+                $config = Setup::createAnnotationMetadataConfiguration([$rootProjectDirectoryPath . DIRECTORY_SEPARATOR . "tests/Dbal/Fixture/ORM"], true, null, null, false);
+
+                $objects = [
+                    DbalConnectionFactory::class => DbalConnection::createEntityManager(EntityManager::create(['url' => $dsn], $config))
+                ];
+                break;
+            }
+            default: {
+                $objects = array_merge($objects, ["managerRegistry" => $connectionFactory, DbalConnectionFactory::class => $connectionFactory]);
+            }
+        }
+
         self::$messagingSystem            = EcotoneLiteConfiguration::createWithConfiguration(
-            __DIR__ . "/../../../../",
-            InMemoryPSRContainer::createFromObjects(array_merge($objects, ["managerRegistry" => $managerRegistryConnectionFactory, DbalConnectionFactory::class => $managerRegistryConnectionFactory])),
+            $rootProjectDirectoryPath,
+            InMemoryPSRContainer::createFromObjects($objects),
             $serviceConfiguration,
             [],
             true
@@ -213,6 +243,44 @@ SQL, ["tableName" => $tableName]
         $this->assertEquals(
             $amount,
             count($this->getQueryBus()->sendWithRouting("order.getRegistered", []))
+        );
+    }
+
+    /**
+     * @param \Doctrine\DBAL\Connection $connection
+     * @param string $enqueueTable
+     * @return false|mixed
+     * @throws \Doctrine\DBAL\Exception
+     */
+    private function checkIfTableExists(\Doctrine\DBAL\Connection $connection, string $enqueueTable): mixed
+    {
+        $isTableExists = $connection->executeQuery(
+            <<<SQL
+SELECT EXISTS (
+   SELECT FROM information_schema.tables 
+   WHERE  table_name   = :tableName
+   );
+SQL, ["tableName" => $enqueueTable]
+        )->fetchOne();
+        return $isTableExists;
+    }
+
+    /**
+     * @When I register person with id :personId and name :name
+     */
+    public function iRegisterPersonWithIdAndName(int $personId, string $name)
+    {
+        $this->getCommandBus()->send(new RegisterPerson($personId, $name));
+    }
+
+    /**
+     * @Then there person with id :personId should be named :name
+     */
+    public function therePersonWithIdShouldBeNamed(int $personId, string $name)
+    {
+        $this->assertEquals(
+            $name,
+            $this->getQueryBus()->sendWithRouting("person.getName", ["personId" => $personId])
         );
     }
 }

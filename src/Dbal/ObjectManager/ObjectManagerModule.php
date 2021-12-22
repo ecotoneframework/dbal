@@ -40,12 +40,7 @@ class ObjectManagerModule implements AnnotationModule
         $connectionFactories = [DbalConnectionFactory::class];
         $pointcut = "(" . AsynchronousRunningEndpoint::class . ")";
 
-        $dbalConfiguration = DbalConfiguration::createWithDefaults();
-        foreach ($extensionObjects as $extensionObject) {
-            if ($extensionObject instanceof DbalConfiguration) {
-                $dbalConfiguration = $extensionObject;
-            }
-        }
+        $dbalConfiguration = $this->getDbalConfiguration($extensionObjects);
 
         if (!$dbalConfiguration->isClearObjectManagerOnAsynchronousEndpoints()) {
             return;
@@ -76,7 +71,14 @@ class ObjectManagerModule implements AnnotationModule
 
     public function getModuleExtensions(array $serviceExtensions): array
     {
-        return [];
+        $dbalConfiguration = $this->getDbalConfiguration($serviceExtensions);
+        $repositories = [];
+
+        if ($dbalConfiguration->isDoctrineORMRepositoriesEnabled()) {
+            $repositories[] = new DoctrineORMRepositoryBuilder($dbalConfiguration->getDoctrineORMRepositoryConnectionReference(), $dbalConfiguration->getDoctrineORMClasses());
+        }
+
+        return $repositories;
     }
 
     /**
@@ -85,5 +87,20 @@ class ObjectManagerModule implements AnnotationModule
     public function getRelatedReferences(): array
     {
         return [];
+    }
+
+    /**
+     * @param array $extensionObjects
+     * @return DbalConfiguration
+     */
+    private function getDbalConfiguration(array $extensionObjects): DbalConfiguration
+    {
+        $dbalConfiguration = DbalConfiguration::createWithDefaults();
+        foreach ($extensionObjects as $extensionObject) {
+            if ($extensionObject instanceof DbalConfiguration) {
+                $dbalConfiguration = $extensionObject;
+            }
+        }
+        return $dbalConfiguration;
     }
 }

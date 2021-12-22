@@ -3,6 +3,7 @@
 namespace Ecotone\Dbal;
 
 use Doctrine\DBAL\Connection;
+use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Ecotone\Messaging\Support\InvalidArgumentException;
 use Enqueue\Dbal\DbalConnectionFactory;
@@ -10,7 +11,7 @@ use Enqueue\Dbal\ManagerRegistryConnectionFactory;
 
 class DbalConnection implements ManagerRegistry
 {
-    private function __construct(private Connection $connection) {}
+    private function __construct(private ?Connection $connection, private ?EntityManagerInterface $entityManager = null) {}
 
     public static function fromConnectionFactory(DbalConnectionFactory $dbalConnectionFactory): ManagerRegistryConnectionFactory
     {
@@ -20,6 +21,16 @@ class DbalConnection implements ManagerRegistry
     public static function create(Connection $connection): ManagerRegistryConnectionFactory
     {
         return new ManagerRegistryConnectionFactory(new self($connection));
+    }
+
+    public static function createEntityManager(EntityManagerInterface $entityManager): ManagerRegistryConnectionFactory
+    {
+        return new ManagerRegistryConnectionFactory(new self($entityManager->getConnection(), $entityManager));
+    }
+
+    public static function createForManagerRegistry(ManagerRegistry $managerRegistry, string $connectionName): ManagerRegistryConnectionFactory
+    {
+        return new ManagerRegistryConnectionFactory($managerRegistry, ["connection_name" => $connectionName]);
     }
 
     public function getDefaultConnectionName()
@@ -49,17 +60,17 @@ class DbalConnection implements ManagerRegistry
 
     public function getManager($name = null)
     {
-        throw InvalidArgumentException::create("Method not supported");
+        return $this->entityManager;
     }
 
     public function getManagers()
     {
-        return [];
+        return $this->entityManager ? [$this->entityManager] : [];
     }
 
     public function resetManager($name = null)
     {
-        throw InvalidArgumentException::create("Method not supported");
+        $this->entityManager->getUnitOfWork()->clear();
     }
 
     public function getAliasNamespace($alias)
@@ -69,16 +80,16 @@ class DbalConnection implements ManagerRegistry
 
     public function getManagerNames()
     {
-        throw InvalidArgumentException::create("Method not supported");
+        return ["default"];
     }
 
     public function getRepository($persistentObject, $persistentManagerName = null)
     {
-        throw InvalidArgumentException::create("Method not supported");
+        return $this->entityManager->getRepository($persistentObject);
     }
 
     public function getManagerForClass($class)
     {
-        // TODO: Implement getManagerForClass() method.
+        return $this->entityManager;
     }
 }

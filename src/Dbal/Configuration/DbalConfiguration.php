@@ -26,6 +26,10 @@ class DbalConfiguration
     private ?string $deduplicationConnectionReference = null;
     private ?string $deadLetterConnectionReference = null;
 
+    private bool $enableDoctrineORMRepositories = false;
+    private ?string $doctrineORMRepositoryConnectionReference = null;
+    private ?array $doctrineORMClasses = null;
+
     private function __construct()
     {
     }
@@ -62,6 +66,21 @@ class DbalConfiguration
         return $this->defaultConnectionReferenceNames[0];
     }
 
+    public function isDoctrineORMRepositoriesEnabled(): bool
+    {
+        return $this->enableDoctrineORMRepositories;
+    }
+
+    public function getDoctrineORMRepositoryConnectionReference(): ?string
+    {
+        return $this->doctrineORMRepositoryConnectionReference;
+    }
+
+    public function getDoctrineORMClasses(): ?array
+    {
+        return $this->doctrineORMClasses;
+    }
+
     public function withTransactionOnAsynchronousEndpoints(bool $isTransactionEnabled) : self
     {
         $self                                     = clone $this;
@@ -74,6 +93,16 @@ class DbalConfiguration
     {
         $self                          = clone $this;
         $self->transactionOnCommandBus = $isTransactionEnabled;
+
+        return $self;
+    }
+
+    public function withDoctrineORMRepositories(bool $isORMEnabled, ?array $relatedClasses = null, string $connectionReferenceName = DbalConnectionFactory::class): self
+    {
+        $self = clone $this;
+        $self->enableDoctrineORMRepositories = $isORMEnabled;
+        $self->doctrineORMRepositoryConnectionReference = $connectionReferenceName;
+        $self->doctrineORMClasses = $relatedClasses;
 
         return $self;
     }

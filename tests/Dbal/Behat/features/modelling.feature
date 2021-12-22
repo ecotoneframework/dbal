@@ -27,3 +27,8 @@ Feature: activating as aggregate order entity
     Then there should 0 error message in dead letter
     When I call pollable endpoint "orderService"
     And there should be 1 orders
+
+  Scenario: Provide support for ORM
+    Given I active messaging for namespace "Test\Ecotone\Dbal\Fixture\ORM"
+    When I register person with id 100 and name "Johny"
+    Then there person with id 100 should be named "Johny"
