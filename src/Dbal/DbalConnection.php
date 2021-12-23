@@ -71,6 +71,8 @@ class DbalConnection implements ManagerRegistry
     public function resetManager($name = null)
     {
         $this->entityManager->getUnitOfWork()->clear();
+
+        return $this->entityManager;
     }
 
     public function getAliasNamespace($alias)
