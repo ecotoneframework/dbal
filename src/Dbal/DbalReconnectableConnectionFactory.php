@@ -8,6 +8,7 @@ use Doctrine\DBAL\Connection;
 use Doctrine\Persistence\ManagerRegistry;
 use Ecotone\Enqueue\ReconnectableConnectionFactory;
 use Ecotone\Messaging\Support\Assert;
+use Ecotone\Messaging\Support\InvalidArgumentException;
 use Enqueue\Dbal\DbalConnectionFactory;
 use Enqueue\Dbal\DbalContext;
 use Enqueue\Dbal\ManagerRegistryConnectionFactory;
@@ -91,7 +92,8 @@ class DbalReconnectableConnectionFactory implements ReconnectableConnectionFacto
                     }
                 }
             }
-            Assert::isTrue(false, "Did not found connection property in " . $reflectionClass->getName());
+
+            throw InvalidArgumentException::create("Did not found connection property in " . $reflectionClass->getName());
         }
     }
 
