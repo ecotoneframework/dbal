@@ -7,6 +7,7 @@ namespace Ecotone\Dbal;
 use Doctrine\DBAL\Connection;
 use Doctrine\Persistence\ManagerRegistry;
 use Ecotone\Enqueue\ReconnectableConnectionFactory;
+use Ecotone\Messaging\Support\Assert;
 use Enqueue\Dbal\DbalConnectionFactory;
 use Enqueue\Dbal\DbalContext;
 use Enqueue\Dbal\ManagerRegistryConnectionFactory;
@@ -16,6 +17,8 @@ use ReflectionClass;
 
 class DbalReconnectableConnectionFactory implements ReconnectableConnectionFactory
 {
+    const CONNECTION_PROPERTIES = ["connection", "_conn"];
+
     private DbalConnectionFactory|ManagerRegistryConnectionFactory $connectionFactory;
 
     public function __construct(DbalConnectionFactory|ManagerRegistryConnectionFactory $dbalConnectionFactory)
@@ -50,18 +53,7 @@ class DbalReconnectableConnectionFactory implements ReconnectableConnectionFacto
 
     public function reconnect(): void
     {
-        $connectionFactory = $this->connectionFactory;
-        if ($connectionFactory instanceof ManagerRegistryConnectionFactory) {
-            list($registry, $connectionName) = self::getManagerRegistryAndConnectionName($connectionFactory);
-            /** @var Connection $connection */
-            $connection = $registry->getConnection($connectionName);
-        }else {
-            $reflectionClass   = new ReflectionClass($connectionFactory);
-            $connectionProperty = $reflectionClass->getProperty("connection");
-            $connectionProperty->setAccessible(true);
-            /** @var Connection $connection */
-            $connection = $connectionProperty->getValue($connectionFactory);
-        }
+        $connection = $this->getConnection();
 
         if ($connection) {
             $connection->close();
@@ -71,21 +63,35 @@ class DbalReconnectableConnectionFactory implements ReconnectableConnectionFacto
 
     public function getConnection() : Connection
     {
-        $connectionFactory = $this->connectionFactory;
-        if ($connectionFactory instanceof ManagerRegistryConnectionFactory) {
-            list($registry, $connectionName) = self::getManagerRegistryAndConnectionName($connectionFactory);
+        return self::getWrappedConnection($this->connectionFactory);
+    }
+
+    /**
+     * @param ManagerRegistryConnectionFactory|Connection $connection
+     */
+    public static function getWrappedConnection(object $connection): Connection
+    {
+        if ($connection instanceof ManagerRegistryConnectionFactory) {
+            list($registry, $connectionName) = self::getManagerRegistryAndConnectionName($connection);
             /** @var Connection $connection */
             return $registry->getConnection($connectionName);
         }else {
-            $reflectionClass   = new ReflectionClass($connectionFactory);
+            $reflectionClass   = new ReflectionClass($connection);
             $method = $reflectionClass->getMethod("establishConnection");
             $method->setAccessible(true);
-            $method->invoke($connectionFactory);
+            $method->invoke($connection);
 
-            $connectionProperty = $reflectionClass->getProperty("connection");
-            $connectionProperty->setAccessible(true);
-            /** @var Connection $connection */
-            return $connectionProperty->getValue($connectionFactory);
+            foreach ($reflectionClass->getProperties() as $property) {
+                foreach (self::CONNECTION_PROPERTIES as $connectionPropertyName) {
+                    if ($property->getName() === $connectionPropertyName) {
+                        $connectionProperty = $reflectionClass->getProperty($connectionPropertyName);
+                        $connectionProperty->setAccessible(true);
+                        /** @var Connection $connection */
+                        return $connectionProperty->getValue($connection);
+                    }
+                }
+            }
+            Assert::isTrue(false, "Did not found connection property in " . $reflectionClass->getName());
         }
     }
 
