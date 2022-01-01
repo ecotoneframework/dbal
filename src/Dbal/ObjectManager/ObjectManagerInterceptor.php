@@ -25,7 +25,7 @@ class ObjectManagerInterceptor
     }
 
     public function transactional(MethodInvocation $methodInvocation, ReferenceSearchService $referenceSearchService)
-    {;
+    {
         /** @var ManagerRegistry[] $objectManagers */
         $objectManagers = [];
 
@@ -36,13 +36,26 @@ class ObjectManagerInterceptor
             }
         }
 
-        foreach ($objectManagers as $objectManager) {
-            foreach ($objectManager->getManagers() as $manager) {
-                $manager->flush();
-                $manager->clear();
+        try {
+            $result = $methodInvocation->proceed();
+
+            foreach ($objectManagers as $objectManager) {
+                foreach ($objectManager->getManagers() as $manager) {
+                    $manager->flush();
+                    $manager->clear();
+                }
             }
+        }catch (\Throwable $exception) {
+            foreach ($objectManagers as $objectManager) {
+                foreach ($objectManager->getManagers() as $manager) {
+                    $manager->clear();
+                }
+            }
+
+            throw $exception;
         }
 
-        return $methodInvocation->proceed();
+
+        return $result;
     }
 }
