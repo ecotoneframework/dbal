@@ -4,6 +4,7 @@ namespace Ecotone\Dbal\ObjectManager;
 
 use Ecotone\AnnotationFinder\AnnotationFinder;
 use Ecotone\Dbal\Configuration\DbalConfiguration;
+use Ecotone\Dbal\DbalTransaction\DbalTransaction;
 use Ecotone\Messaging\Attribute\AsynchronousRunningEndpoint;
 use Ecotone\Messaging\Attribute\ConsoleCommand;
 use Ecotone\Messaging\Attribute\ModuleAnnotation;
@@ -38,13 +39,20 @@ class ObjectManagerModule implements AnnotationModule
     public function prepare(Configuration $configuration, array $extensionObjects, ModuleReferenceSearchService $moduleReferenceSearchService): void
     {
         $connectionFactories = [DbalConnectionFactory::class];
-        $pointcut = "(" . AsynchronousRunningEndpoint::class . ")";
+        $pointcut            = "(" . DbalTransaction::class . ")";
 
         $dbalConfiguration = $this->getDbalConfiguration($extensionObjects);
 
-        if (!$dbalConfiguration->isClearObjectManagerOnAsynchronousEndpoints()) {
-            return;
+        if ($dbalConfiguration->isTransactionOnCommandBus()) {
+            $pointcut .= "||(" . CommandBus::class . ")";
         }
+        if ($dbalConfiguration->isTransactionOnConsoleCommands()) {
+            $pointcut .= "||(" . ConsoleCommand::class . ")";
+        }
+        if ($dbalConfiguration->isClearObjectManagerOnAsynchronousEndpoints()) {
+            $pointcut .= "||(" . AsynchronousRunningEndpoint::class . ")";
+        }
+
         if ($dbalConfiguration->getDefaultConnectionReferenceNames()) {
             $connectionFactories = $dbalConfiguration->getDefaultConnectionReferenceNames();
         }
