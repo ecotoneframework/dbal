@@ -69,15 +69,10 @@ class DbalOutboundChannelAdapter implements MessageHandler
         try {
             $this->connectionFactory->getProducer()
                 ->setTimeToLive($outboundMessage->getTimeToLive())
-                ->setDeliveryDelay($this->roundToExpectedSeconds($outboundMessage))
+                ->setDeliveryDelay($outboundMessage->getDeliveryDelay())
                 ->send(new DbalDestination($this->queueName), $messageToSend);
         } catch (Exception $exception) {
             throw $exception->getPrevious() ? $exception->getPrevious() : $exception;
         }
-    }
-
-    private function roundToExpectedSeconds(OutboundMessage $outboundMessage): int
-    {
-        return (int)round($outboundMessage->getDeliveryDelay() / 1000);
     }
 }

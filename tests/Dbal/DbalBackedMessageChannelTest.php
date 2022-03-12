@@ -6,6 +6,7 @@ namespace Test\Ecotone\Dbal;
 
 use Ecotone\Dbal\DbalBackedMessageChannelBuilder;
 use Ecotone\Messaging\Handler\InMemoryReferenceSearchService;
+use Ecotone\Messaging\MessageHeaders;
 use Ecotone\Messaging\PollableChannel;
 use Ecotone\Messaging\Support\MessageBuilder;
 use Enqueue\Dbal\DbalConnectionFactory;
@@ -128,5 +129,25 @@ class DbalBackedMessageChannelTest extends DbalMessagingTest
         $receivedMessage = $messageChannel->receive();
 
         $this->assertNotNull($receivedMessage, "Not received message");
+    }
+
+    public function test_delaying_the_message()
+    {
+        $messageChannel = DbalBackedMessageChannelBuilder::create(Uuid::uuid4()->toString())
+            ->withReceiveTimeout(1)
+            ->build(InMemoryReferenceSearchService::createWith([
+                DbalConnectionFactory::class => $this->getConnectionFactory(true)
+            ]));
+        $messageChannel->send(
+            MessageBuilder::withPayload("some")
+                ->setHeader(MessageHeaders::DELIVERY_DELAY, 1000)
+                ->build()
+        );
+
+        $this->assertNull($messageChannel->receive());
+
+        sleep(1);
+
+        $this->assertNotNull($messageChannel->receive());
     }
 }
