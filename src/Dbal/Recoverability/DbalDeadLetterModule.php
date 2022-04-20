@@ -56,12 +56,12 @@ class DbalDeadLetterModule implements AnnotationModule
             return;
         }
 
-        $this->registerOneTimeCommand("list", self::LIST_COMMAND_NAME, $configuration);
-        $this->registerOneTimeCommand("show", self::SHOW_COMMAND_NAME, $configuration);
-        $this->registerOneTimeCommand("reply", self::REPLAY_COMMAND_NAME, $configuration);
-        $this->registerOneTimeCommand("replyAll", self::REPLAY_ALL_COMMAND_NAME, $configuration);
-        $this->registerOneTimeCommand("delete", self::DELETE_COMMAND_NAME, $configuration);
-        $this->registerOneTimeCommand("help", self::HELP_COMMAND_NAME, $configuration);
+        $this->registerOneTimeCommand("list", self::LIST_COMMAND_NAME, $configuration, $interfaceToCallRegistry);
+        $this->registerOneTimeCommand("show", self::SHOW_COMMAND_NAME, $configuration, $interfaceToCallRegistry);
+        $this->registerOneTimeCommand("reply", self::REPLAY_COMMAND_NAME, $configuration, $interfaceToCallRegistry);
+        $this->registerOneTimeCommand("replyAll", self::REPLAY_ALL_COMMAND_NAME, $configuration, $interfaceToCallRegistry);
+        $this->registerOneTimeCommand("delete", self::DELETE_COMMAND_NAME, $configuration, $interfaceToCallRegistry);
+        $this->registerOneTimeCommand("help", self::HELP_COMMAND_NAME, $configuration, $interfaceToCallRegistry);
 
         $configuration
             ->registerMessageHandler(DbalDeadLetterBuilder::createStore($connectionFactory))
@@ -137,10 +137,10 @@ class DbalDeadLetterModule implements AnnotationModule
         return [];
     }
 
-    private function registerOneTimeCommand(string $methodName, string $commandName, Configuration $configuration): void
+    private function registerOneTimeCommand(string $methodName, string $commandName, Configuration $configuration, InterfaceToCallRegistry $interfaceToCallRegistry): void
     {
         list($messageHandlerBuilder, $oneTimeCommandConfiguration) = ConsoleCommandModule::prepareConsoleCommandForDirectObject(
-            new DbalDeadLetterConsoleCommand(), $methodName, $commandName, true
+            new DbalDeadLetterConsoleCommand(), $methodName, $commandName, true, $interfaceToCallRegistry
         );
         $configuration
             ->registerMessageHandler($messageHandlerBuilder)
