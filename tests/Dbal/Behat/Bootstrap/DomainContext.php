@@ -5,6 +5,7 @@ namespace Test\Ecotone\Dbal\Behat\Bootstrap;
 use Behat\Behat\Tester\Exception\PendingException;
 use Behat\Behat\Context\Context;
 use Ecotone\Dbal\DbalConnection;
+use Ecotone\Dbal\DocumentStore\DbalDocumentStore;
 use Ecotone\Dbal\Recoverability\DbalDeadLetter;
 use Ecotone\Dbal\Recoverability\DeadLetterGateway;
 use Ecotone\Lite\EcotoneLiteConfiguration;
@@ -12,10 +13,12 @@ use Ecotone\Lite\InMemoryPSRContainer;
 use Ecotone\Messaging\Config\ConfiguredMessagingSystem;
 use Ecotone\Messaging\Config\MessagingSystemConfiguration;
 use Ecotone\Messaging\Config\ServiceConfiguration;
+use Ecotone\Messaging\Store\Document\DocumentStore;
 use Ecotone\Modelling\CommandBus;
 use Ecotone\Modelling\QueryBus;
 use Enqueue\Dbal\DbalConnectionFactory;
 use Enqueue\Dbal\ManagerRegistryConnectionFactory;
+use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 use Test\Ecotone\Dbal\Fixture\DeadLetter\OrderGateway;
@@ -64,6 +67,18 @@ class DomainContext extends TestCase implements Context
                 ];
                 break;
             }
+            case "Test\Ecotone\Dbal\Fixture\DocumentStore": {
+                $objects = [
+
+                ];
+                break;
+            }
+            case "Test\Ecotone\Dbal\Fixture\InMemoryDocumentStore": {
+                $objects = [
+
+                ];
+                break;
+            }
             default: {
                 throw new \InvalidArgumentException("Namespace {$namespace} not yet implemented");
             }
@@ -77,6 +92,7 @@ class DomainContext extends TestCase implements Context
             $this->deleteFromTableExists($enqueueTable, $connection);
             $this->deleteFromTableExists(OrderService::ORDER_TABLE, $connection);
             $this->deleteFromTableExists(DbalDeadLetter::DEFAULT_DEAD_LETTER_TABLE, $connection);
+            $this->deleteFromTableExists(DbalDocumentStore::ECOTONE_DOCUMENT_STORE, $connection);
         }
 
         $rootProjectDirectoryPath = __DIR__ . "/../../../../";
@@ -162,6 +178,11 @@ SQL, ["tableName" => $tableName]
     private function getQueryBus() : QueryBus
     {
         return self::$messagingSystem->getGatewayByName(QueryBus::class);
+    }
+
+    private function getDocumentStore() : DocumentStore
+    {
+        return self::$messagingSystem->getGatewayByName(DocumentStore::class);
     }
 
     /**
@@ -282,5 +303,68 @@ SQL, ["tableName" => $enqueueTable]
             $name,
             $this->getQueryBus()->sendWithRouting("person.getName", ["personId" => $personId])
         );
+    }
+
+    /**
+     * @When I place order nr :orderId for :order in :shopName
+     */
+    public function iPlaceOrderNrForIn(int $orderId, string $order, string $shopName)
+    {
+        $this->getDocumentStore()->addDocument(
+            $shopName,
+            $orderId,
+            $this->convertOrderToJson($order)
+        );
+    }
+
+    /**
+     * @Then there should be order nr :orderId3 in :shopName with :order
+     */
+    public function thereShouldBeOrderNrInWith(int $orderId, string $shopName, string $order)
+    {
+        Assert::assertEquals(
+            $this->convertOrderToJson($order),
+            $this->getDocumentStore()->getDocument($shopName, $orderId)
+        );
+    }
+
+    /**
+     * @Then there should :numberOfOrders order placed in :shopName
+     */
+    public function thereShouldOrderPlacedIn(int $numberOfOrders, string $shopName)
+    {
+        Assert::assertEquals(
+            $numberOfOrders,
+            $this->getDocumentStore()->countDocuments($shopName)
+        );
+    }
+
+    /**
+     * @When I update order nr :orderId in :shopName to :order
+     */
+    public function iUpdateOrderNrInTo(int $orderId, string $shopName, string $order)
+    {
+        $this->getDocumentStore()->updateDocument($shopName, $orderId, $this->convertOrderToJson($order));
+    }
+
+    /**
+     * @When I upsert order nr :orderId for :order in :shopName
+     */
+    public function iUpsertOrderNrForIn(int $orderId, string $order, string $shopName)
+    {
+        $this->getDocumentStore()->upsertDocument($shopName, $orderId, $this->convertOrderToJson($order));
+    }
+
+    /**
+     * @When I delete order nr :orderId in :shopName
+     */
+    public function iDeleteOrderNrIn(int $orderId, string $shopName)
+    {
+        $this->getDocumentStore()->deleteDocument($shopName, $orderId);
+    }
+
+    private function convertOrderToJson(string $order): string
+    {
+        return \json_encode(["data" => $order]);
     }
 }

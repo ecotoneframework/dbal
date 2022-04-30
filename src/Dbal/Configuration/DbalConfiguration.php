@@ -3,7 +3,9 @@
 namespace Ecotone\Dbal\Configuration;
 
 use Ecotone\Messaging\Config\ConfigurationException;
+use Ecotone\Messaging\Store\Document\DocumentStore;
 use Enqueue\Dbal\DbalConnectionFactory;
+use phpDocumentor\Reflection\Types\Self_;
 
 class DbalConfiguration
 {
@@ -29,6 +31,11 @@ class DbalConfiguration
     private bool $enableDoctrineORMRepositories = false;
     private ?string $doctrineORMRepositoryConnectionReference = null;
     private ?array $doctrineORMClasses = null;
+    private bool $enableDbalDocumentStore = true;
+    private string $dbalDocumentStoreReference = DocumentStore::class;
+    private bool $initializeDbalDocumentStore = true;
+    private string $documentStoreConnectionReference = DbalConnectionFactory::class;
+    private bool $inMemoryDocumentStore = false;
 
     private function __construct()
     {
@@ -149,6 +156,18 @@ class DbalConfiguration
         return $self;
     }
 
+    public function withDocumentStore(bool $isDocumentStoreEnabled = true, bool $inMemoryDocumentStore = false, string $reference = DocumentStore::class, bool $initializeDatabaseTable = true, string $connectionReference = DbalConnectionFactory::class): self
+    {
+        $self = clone $this;
+        $self->enableDbalDocumentStore = $isDocumentStoreEnabled;
+        $self->inMemoryDocumentStore = $inMemoryDocumentStore;
+        $self->dbalDocumentStoreReference = $reference;
+        $this->initializeDbalDocumentStore = $initializeDatabaseTable;
+        $this->documentStoreConnectionReference = $connectionReference;
+
+        return $self;
+    }
+
     public function isDeduplicatedEnabled(): bool
     {
         return $this->deduplicatedEnabled;
@@ -182,5 +201,30 @@ class DbalConfiguration
     public function isClearObjectManagerOnAsynchronousEndpoints(): bool
     {
         return $this->clearObjectManagerOnAsynchronousEndpoints;
+    }
+
+    public function isEnableDbalDocumentStore(): bool
+    {
+        return $this->enableDbalDocumentStore;
+    }
+
+    public function getDbalDocumentStoreReference(): string
+    {
+        return $this->dbalDocumentStoreReference;
+    }
+
+    public function isInitializeDbalDocumentStore(): bool
+    {
+        return $this->initializeDbalDocumentStore;
+    }
+
+    public function getDocumentStoreConnectionReference(): string
+    {
+        return $this->documentStoreConnectionReference;
+    }
+
+    public function isInMemoryDocumentStore(): bool
+    {
+        return $this->inMemoryDocumentStore;
     }
 }
