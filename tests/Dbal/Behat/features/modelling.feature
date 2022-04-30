@@ -72,3 +72,8 @@ Feature: activating as aggregate order entity
     And there should 2 order placed in "milky_shop"
     When I delete order nr 100 in "milky_shop"
     And there should 1 order placed in "milky_shop"
+
+  Scenario: Provide support for Document Store aggregate
+    Given I active messaging for namespace "Test\Ecotone\Dbal\Fixture\DocumentStoreAggregate"
+    When I register person with id 100 and name "Johny" for document aggregate
+    Then there person with id 100 should be named "Johny"  for document aggregate

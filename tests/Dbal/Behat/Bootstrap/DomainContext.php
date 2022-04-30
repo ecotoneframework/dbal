@@ -22,6 +22,7 @@ use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 use Test\Ecotone\Dbal\Fixture\DeadLetter\OrderGateway;
+use Test\Ecotone\Dbal\Fixture\DocumentStoreAggregate\PersonJsonConverter;
 use Test\Ecotone\Dbal\Fixture\ORM\RegisterPerson;
 use Test\Ecotone\Dbal\Fixture\Transaction\OrderService;
 use Doctrine\ORM\Tools\Setup;
@@ -62,21 +63,19 @@ class DomainContext extends TestCase implements Context
                 break;
             }
             case "Test\Ecotone\Dbal\Fixture\ORM": {
-                $objects = [
-
-                ];
+                $objects = [];
                 break;
             }
             case "Test\Ecotone\Dbal\Fixture\DocumentStore": {
-                $objects = [
-
-                ];
+                $objects = [];
                 break;
             }
             case "Test\Ecotone\Dbal\Fixture\InMemoryDocumentStore": {
-                $objects = [
-
-                ];
+                $objects = [];
+                break;
+            }
+            case "Test\Ecotone\Dbal\Fixture\DocumentStoreAggregate": {
+                $objects = [new PersonJsonConverter()];
                 break;
             }
             default: {
@@ -366,5 +365,24 @@ SQL, ["tableName" => $enqueueTable]
     private function convertOrderToJson(string $order): string
     {
         return \json_encode(["data" => $order]);
+    }
+
+    /**
+     * @When I register person with id :id and name :name for document aggregate
+     */
+    public function iRegisterPersonWithIdAndNameForDocumentAggregate(int $id, string $name)
+    {
+        $this->getCommandBus()->send(new \Test\Ecotone\Dbal\Fixture\DocumentStoreAggregate\RegisterPerson($id, $name));
+    }
+
+    /**
+     * @Then there person with id :id should be named :name  for document aggregate
+     */
+    public function therePersonWithIdShouldBeNamedForDocumentAggregate(int $id, string $name)
+    {
+        Assert::assertEquals(
+            $name,
+            $this->getQueryBus()->sendWithRouting("person.getName", metadata: ["aggregate.id" => $id])
+        );
     }
 }

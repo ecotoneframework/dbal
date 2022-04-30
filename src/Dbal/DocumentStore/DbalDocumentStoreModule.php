@@ -34,12 +34,7 @@ class DbalDocumentStoreModule implements AnnotationModule
      */
     public function prepare(Configuration $configuration, array $extensionObjects, ModuleReferenceSearchService $moduleReferenceSearchService, InterfaceToCallRegistry $interfaceToCallRegistry): void
     {
-        $dbalConfiguration = DbalConfiguration::createWithDefaults();
-        foreach ($extensionObjects as $extensionObject) {
-            if ($extensionObject instanceof DbalConfiguration) {
-                $dbalConfiguration = $extensionObject;
-            }
-        }
+        $dbalConfiguration = $this->getDbalConfiguration($extensionObjects);
 
         if (!$dbalConfiguration->isEnableDbalDocumentStore()) {
             return;
@@ -177,6 +172,12 @@ class DbalDocumentStoreModule implements AnnotationModule
 
     public function getModuleExtensions(array $serviceExtensions): array
     {
+        $dbalConfiguration = $this->getDbalConfiguration($serviceExtensions);
+
+        if ($dbalConfiguration->isEnableDocumentStoreAggregateRepository()) {
+            return [new DocumentStoreAggregateRepositoryBuilder($dbalConfiguration->getDbalDocumentStoreReference())];
+        }
+
         return [];
     }
 
@@ -186,5 +187,16 @@ class DbalDocumentStoreModule implements AnnotationModule
     public function getRelatedReferences(): array
     {
         return [];
+    }
+
+    private function getDbalConfiguration(array $extensionObjects): DbalConfiguration
+    {
+        $dbalConfiguration = DbalConfiguration::createWithDefaults();
+        foreach ($extensionObjects as $extensionObject) {
+            if ($extensionObject instanceof DbalConfiguration) {
+                $dbalConfiguration = $extensionObject;
+            }
+        }
+        return $dbalConfiguration;
     }
 }

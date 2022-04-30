@@ -37,6 +37,8 @@ class DbalConfiguration
     private string $documentStoreConnectionReference = DbalConnectionFactory::class;
     private bool $inMemoryDocumentStore = false;
 
+    private bool $enableDocumentStoreAggregateRepository = false;
+
     private function __construct()
     {
     }
@@ -156,14 +158,15 @@ class DbalConfiguration
         return $self;
     }
 
-    public function withDocumentStore(bool $isDocumentStoreEnabled = true, bool $inMemoryDocumentStore = false, string $reference = DocumentStore::class, bool $initializeDatabaseTable = true, string $connectionReference = DbalConnectionFactory::class): self
+    public function withDocumentStore(bool $isDocumentStoreEnabled = true, bool $inMemoryDocumentStore = false, string $reference = DocumentStore::class, bool $initializeDatabaseTable = true, bool $enableDocumentStoreAggregateRepository = false, string $connectionReference = DbalConnectionFactory::class): self
     {
         $self = clone $this;
         $self->enableDbalDocumentStore = $isDocumentStoreEnabled;
         $self->inMemoryDocumentStore = $inMemoryDocumentStore;
         $self->dbalDocumentStoreReference = $reference;
-        $this->initializeDbalDocumentStore = $initializeDatabaseTable;
-        $this->documentStoreConnectionReference = $connectionReference;
+        $self->initializeDbalDocumentStore = $initializeDatabaseTable;
+        $self->documentStoreConnectionReference = $connectionReference;
+        $self->enableDocumentStoreAggregateRepository = $enableDocumentStoreAggregateRepository;
 
         return $self;
     }
@@ -226,5 +229,10 @@ class DbalConfiguration
     public function isInMemoryDocumentStore(): bool
     {
         return $this->inMemoryDocumentStore;
+    }
+
+    public function isEnableDocumentStoreAggregateRepository(): bool
+    {
+        return $this->enableDocumentStoreAggregateRepository;
     }
 }
