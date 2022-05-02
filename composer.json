@@ -34,7 +34,7 @@
     }
   },
   "require": {
-    "ecotone/enqueue": "~1.21.1",
+    "ecotone/enqueue": "~1.22.0",
     "enqueue/dbal": "^0.10.0"
   },
   "require-dev": {
@@ -49,7 +49,7 @@
   },
   "extra": {
     "branch-alias": {
-      "dev-master": "1.21.1-dev"
+      "dev-master": "1.22.0-dev"
     }
   }
 }

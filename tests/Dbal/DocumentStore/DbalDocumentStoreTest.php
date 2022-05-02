@@ -170,6 +170,44 @@ final class DbalDocumentStoreTest extends DbalMessagingTest
         $this->assertEquals(0, $documentStore->countDocuments('users'));
     }
 
+    public function test_retrieving_whole_collection()
+    {
+        $documentStore = $this->getDocumentStore();
+
+        $this->assertEquals([],$documentStore->getAllDocuments('users'));
+
+        $documentStore->addDocument('users', '123', '{"name":"Johny"}');
+        $documentStore->addDocument('users', '124', '{"name":"Franco"}');
+
+        $this->assertEquals([
+            '{"name":"Johny"}',
+            '{"name":"Franco"}'
+        ], $documentStore->getAllDocuments('users'));
+    }
+
+    public function test_retrieving_whole_collection_of_objects()
+    {
+        $documentStore = new DbalDocumentStore(
+            CachedConnectionFactory::createFor(new DbalReconnectableConnectionFactory($this->getConnectionFactory())),
+            true,
+            InMemoryConversionService::createWithConversion(
+                new \stdClass(),
+                MediaType::APPLICATION_X_PHP,
+                \stdClass::class,
+                MediaType::APPLICATION_JSON,
+                TypeDescriptor::STRING,
+                '{"name":"johny"}'
+            )
+        );
+
+        $this->assertEquals(0, $documentStore->countDocuments('users'));
+
+        $documentStore->addDocument('users', '123', new \stdClass());
+        $documentStore->addDocument('users', '124', new \stdClass());
+
+        $this->assertEquals([new \stdClass(),new \stdClass()], $documentStore->getAllDocuments('users'));
+    }
+
     public function test_dropping_non_existing_collection()
     {
         $documentStore = $this->getDocumentStore();

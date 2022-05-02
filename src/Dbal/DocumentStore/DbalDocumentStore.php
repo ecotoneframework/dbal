@@ -51,7 +51,7 @@ final class DbalDocumentStore implements DocumentStore
                     'collection' => $collectionName,
                     'document_id' => $documentId,
                     'document_type' => $type->toString(),
-                    'document' => $this->convertDocument($type, $document)
+                    'document' => $this->convertToJSONDocument($type, $document)
                 ],
                 [
                     'collection' => Types::STRING,
@@ -105,18 +105,31 @@ final class DbalDocumentStore implements DocumentStore
         );
     }
 
+    public function getAllDocuments(string $collectionName): array
+    {
+        if (!$this->doesTableExists()) {
+            return [];
+        }
+
+        $select = $this->getDocumentsFor($collectionName)
+            ->fetchAllAssociative();
+        
+        $documents = [];
+        foreach ($select as $documentRecord) {
+            $documents[] = $this->convertFromJSONDocument($documentRecord);
+        }
+
+        return $documents;
+    }
+
     public function getDocument(string $collectionName, string $documentId): array|object|string
     {
         if (!$this->doesTableExists()) {
             throw DocumentException::create(sprintf("Document with id %s does not exists in Collection %s", $documentId, $collectionName));
         }
 
-        $select = $this->getConnection()->createQueryBuilder()
-            ->select('document', 'document_type')
-            ->from($this->getTableName())
-            ->andWhere('collection = :collection')
+        $select = $this->getDocumentsFor($collectionName)
             ->andWhere('document_id = :documentId')
-            ->setParameter('collection', $collectionName, Types::TEXT)
             ->setParameter('documentId', $documentId, Types::TEXT)
             ->setMaxResults(1)
             ->fetchAllAssociative();
@@ -126,18 +139,7 @@ final class DbalDocumentStore implements DocumentStore
         }
         $select = $select[0];
 
-        $documentType = TypeDescriptor::create($select['document_type']);
-        if ($documentType->isString()) {
-            return $select['document'];
-        }
-
-        return $this->conversionService->convert(
-            $select['document'],
-            TypeDescriptor::createStringType(),
-            MediaType::createApplicationJson(),
-            $documentType,
-            MediaType::createApplicationXPHP()
-        );
+        return $this->convertFromJSONDocument($select);
     }
 
     public function countDocuments(string $collectionName): int
@@ -210,7 +212,7 @@ final class DbalDocumentStore implements DocumentStore
         return !$this->initialize;
     }
 
-    private function convertDocument(TypeDescriptor $type, object|array|string $document): mixed
+    private function convertToJSONDocument(TypeDescriptor $type, object|array|string $document): mixed
     {
         if (!$type->isString()) {
             $document = $this->conversionService->convert(
@@ -233,7 +235,7 @@ final class DbalDocumentStore implements DocumentStore
                 $this->getTableName(),
                 [
                     'document_type' => $type->toString(),
-                    'document' => $this->convertDocument($type, $document)
+                    'document' => $this->convertToJSONDocument($type, $document)
                 ],
                 [
                     'document_id' => $documentId,
@@ -251,5 +253,30 @@ final class DbalDocumentStore implements DocumentStore
         }
 
         return $rowsAffected;
+    }
+
+    private function getDocumentsFor(string $collectionName): \Doctrine\DBAL\Query\QueryBuilder
+    {
+        return $this->getConnection()->createQueryBuilder()
+            ->select('document', 'document_type')
+            ->from($this->getTableName())
+            ->andWhere('collection = :collection')
+            ->setParameter('collection', $collectionName, Types::TEXT);
+    }
+
+    private function convertFromJSONDocument(mixed $select): mixed
+    {
+        $documentType = TypeDescriptor::create($select['document_type']);
+        if ($documentType->isString()) {
+            return $select['document'];
+        }
+
+        return $this->conversionService->convert(
+            $select['document'],
+            TypeDescriptor::createStringType(),
+            MediaType::createApplicationJson(),
+            $documentType,
+            MediaType::createApplicationXPHP()
+        );
     }
 }

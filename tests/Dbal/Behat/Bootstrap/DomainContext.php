@@ -332,10 +332,8 @@ SQL, ["tableName" => $enqueueTable]
      */
     public function thereShouldOrderPlacedIn(int $numberOfOrders, string $shopName)
     {
-        Assert::assertEquals(
-            $numberOfOrders,
-            $this->getDocumentStore()->countDocuments($shopName)
-        );
+        Assert::assertEquals($numberOfOrders,$this->getDocumentStore()->countDocuments($shopName));
+        Assert::assertEquals($numberOfOrders, count($this->getDocumentStore()->getAllDocuments($shopName)));
     }
 
     /**
