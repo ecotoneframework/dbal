@@ -11,6 +11,7 @@ use Ecotone\Messaging\Conversion\ConversionService;
 use Ecotone\Messaging\Conversion\MediaType;
 use Ecotone\Messaging\Handler\TypeDescriptor;
 use Ecotone\Messaging\Store\Document\DocumentException;
+use Ecotone\Messaging\Store\Document\DocumentNotFound;
 use Ecotone\Messaging\Store\Document\DocumentStore;
 use Enqueue\Dbal\DbalContext;
 use Interop\Queue\Exception\Exception;
@@ -65,7 +66,7 @@ final class DbalDocumentStore implements DocumentStore
         }
 
         if (1 !== $rowsAffected) {
-            throw new Exception(sprintf("There was a problem inserting document with id %s to collection %s. Dbal did not confirm that the record was inserted.", $documentId, $collectionName));
+            throw DocumentNotFound::create(sprintf("There was a problem inserting document with id %s to collection %s. Dbal did not confirm that the record was inserted.", $documentId, $collectionName));
         }
     }
 
@@ -76,7 +77,7 @@ final class DbalDocumentStore implements DocumentStore
         $rowsAffected = $this->updateDocumentInternally($document, $documentId, $collectionName);
 
         if (1 !== $rowsAffected) {
-            throw new Exception(sprintf("There is no document with id %s in collection %s to update.", $documentId, $collectionName));
+            throw DocumentNotFound::create(sprintf("There is no document with id %s in collection %s to update.", $documentId, $collectionName));
         }
     }
 
@@ -125,7 +126,7 @@ final class DbalDocumentStore implements DocumentStore
     public function getDocument(string $collectionName, string $documentId): array|object|string
     {
         if (!$this->doesTableExists()) {
-            throw DocumentException::create(sprintf("Document with id %s does not exists in Collection %s", $documentId, $collectionName));
+            throw DocumentNotFound::create(sprintf("Document with id %s does not exists in Collection %s", $documentId, $collectionName));
         }
 
         $select = $this->getDocumentsFor($collectionName)
@@ -135,7 +136,7 @@ final class DbalDocumentStore implements DocumentStore
             ->fetchAllAssociative();
 
         if (!$select) {
-            throw DocumentException::create(sprintf("Document with id %s does not exists in Collection %s", $documentId, $collectionName));
+            throw DocumentNotFound::create(sprintf("Document with id %s does not exists in Collection %s", $documentId, $collectionName));
         }
         $select = $select[0];
 

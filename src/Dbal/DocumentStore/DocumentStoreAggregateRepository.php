@@ -2,6 +2,8 @@
 
 namespace Ecotone\Dbal\DocumentStore;
 
+use Ecotone\Messaging\Store\Document\DocumentException;
+use Ecotone\Messaging\Store\Document\DocumentNotFound;
 use Ecotone\Messaging\Store\Document\DocumentStore;
 use Ecotone\Modelling\StandardRepository;
 
@@ -20,7 +22,11 @@ final class DocumentStoreAggregateRepository implements StandardRepository
     {
         $aggregateId = array_pop($identifiers);
 
-        return $this->documentStore->getDocument(self::COLLECTION_NAME, $aggregateId);
+        try {
+            return $this->documentStore->getDocument(self::COLLECTION_NAME, $aggregateId);
+        }catch (DocumentNotFound) {
+            return null;
+        }
     }
 
     public function save(array $identifiers, object $aggregate, array $metadata, ?int $versionBeforeHandling): void
