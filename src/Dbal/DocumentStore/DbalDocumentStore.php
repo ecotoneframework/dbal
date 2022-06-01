@@ -188,10 +188,15 @@ final class DbalDocumentStore implements DocumentStore
         $table->addColumn('document_type', Types::TEXT);
         $table->addColumn('document', Types::JSON);
 
-        if ($sm->getDatabasePlatform()->getName()) {
-            $table->addIndex(['collection', 'document_id'],null,[],["lengths"=>[255,255]]);
+        $columnNames=['collection', 'document_id'];
+        if ($sm->getDatabasePlatform()->getName()==='mysql') {
+            $table->addIndex($columnNames,null,[],["lengths"=>[255,255]]);
+            foreach ($columnNames as $columnName) {
+                $column = $table->getColumn($columnName);
+                $column->setNotnull(true);
+            }
         } else {
-            $table->setPrimaryKey(['collection', 'document_id']);
+            $table->setPrimaryKey($columnNames);
         }
 
         $sm->createTable($table);
