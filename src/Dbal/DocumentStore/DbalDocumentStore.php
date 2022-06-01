@@ -184,7 +184,7 @@ final class DbalDocumentStore implements DocumentStore
         $table = new Table($this->getTableName());
 
         $table->addColumn('collection', Types::STRING);
-        $table->addColumn('document_id', Types::TEXT);
+        $table->addColumn('document_id', Types::STRING);
         $table->addColumn('document_type', Types::TEXT);
         $table->addColumn('document', Types::JSON);
 
