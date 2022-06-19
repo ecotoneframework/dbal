@@ -325,6 +325,10 @@ SQL, ["tableName" => $enqueueTable]
             $this->convertOrderToJson($order),
             $this->getDocumentStore()->getDocument($shopName, $orderId)
         );
+        Assert::assertEquals(
+            $this->convertOrderToJson($order),
+            $this->getDocumentStore()->findDocument($shopName, $orderId)
+        );
     }
 
     /**

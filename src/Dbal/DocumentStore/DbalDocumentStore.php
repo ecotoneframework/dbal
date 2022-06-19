@@ -125,8 +125,19 @@ final class DbalDocumentStore implements DocumentStore
 
     public function getDocument(string $collectionName, string $documentId): array|object|string
     {
-        if (!$this->doesTableExists()) {
+        $document = $this->findDocument($collectionName, $documentId);
+
+        if (is_null($document)) {
             throw DocumentNotFound::create(sprintf("Document with id %s does not exists in Collection %s", $documentId, $collectionName));
+        }
+
+        return $document;
+    }
+
+    public function findDocument(string $collectionName, string $documentId): array|object|string|null
+    {
+        if (!$this->doesTableExists()) {
+            return null;
         }
 
         $select = $this->getDocumentsFor($collectionName)
@@ -136,7 +147,7 @@ final class DbalDocumentStore implements DocumentStore
             ->fetchAllAssociative();
 
         if (!$select) {
-            throw DocumentNotFound::create(sprintf("Document with id %s does not exists in Collection %s", $documentId, $collectionName));
+            return null;
         }
         $select = $select[0];
 

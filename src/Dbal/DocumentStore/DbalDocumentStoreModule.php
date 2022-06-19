@@ -101,6 +101,15 @@ class DbalDocumentStoreModule implements AnnotationModule
                     )
             )
             ->registerGatewayBuilder(
+                GatewayProxyBuilder::create($referenceName, DocumentStore::class, "findDocument", DocumentStoreMessageChannel::findDocument($referenceName))
+                    ->withParameterConverters(
+                        [
+                            GatewayHeaderBuilder::create(self::COLLECTION_NAME_PARAMETER, self::ECOTONE_DBAL_DOCUMENT_STORE_COLLECTION_NAME),
+                            GatewayHeaderBuilder::create(self::DOCUMENT_ID_PARAMETER, self::ECOTONE_DBAL_DOCUMENT_STORE_DOCUMENT_ID)
+                        ]
+                    )
+            )
+            ->registerGatewayBuilder(
                 GatewayProxyBuilder::create($referenceName, DocumentStore::class, "countDocuments", DocumentStoreMessageChannel::countDocuments($referenceName))
                     ->withParameterConverters(
                         [
@@ -150,6 +159,12 @@ class DbalDocumentStoreModule implements AnnotationModule
             )
             ->registerMessageHandler(
                 new DbalDocumentStoreBuilder(DocumentStoreMessageChannel::getDocument($referenceName), "getDocument", $dbalConfiguration->isInitializeDbalDocumentStore(), $dbalConfiguration->getDocumentStoreConnectionReference(), $dbalConfiguration->isInMemoryDocumentStore(), $inMemoryDocumentStore, [
+                    HeaderBuilder::create(self::COLLECTION_NAME_PARAMETER, self::ECOTONE_DBAL_DOCUMENT_STORE_COLLECTION_NAME),
+                    HeaderBuilder::create(self::DOCUMENT_ID_PARAMETER, self::ECOTONE_DBAL_DOCUMENT_STORE_DOCUMENT_ID)
+                ])
+            )
+            ->registerMessageHandler(
+                new DbalDocumentStoreBuilder(DocumentStoreMessageChannel::findDocument($referenceName), "findDocument", $dbalConfiguration->isInitializeDbalDocumentStore(), $dbalConfiguration->getDocumentStoreConnectionReference(), $dbalConfiguration->isInMemoryDocumentStore(), $inMemoryDocumentStore, [
                     HeaderBuilder::create(self::COLLECTION_NAME_PARAMETER, self::ECOTONE_DBAL_DOCUMENT_STORE_COLLECTION_NAME),
                     HeaderBuilder::create(self::DOCUMENT_ID_PARAMETER, self::ECOTONE_DBAL_DOCUMENT_STORE_DOCUMENT_ID)
                 ])

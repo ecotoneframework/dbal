@@ -28,6 +28,17 @@ final class DbalDocumentStoreTest extends DbalMessagingTest
         $this->assertEquals(1, $documentStore->countDocuments('users'));
     }
 
+    public function test_finding_document_to_collection()
+    {
+        $documentStore = $this->getDocumentStore();
+
+        $this->assertNull($documentStore->findDocument('users', '123'));
+
+        $documentStore->addDocument('users', '123', '{"name":"Johny"}');
+
+        $this->assertEquals('{"name":"Johny"}', $documentStore->findDocument('users', '123'));
+    }
+
     public function test_updating_document()
     {
         $documentStore = $this->getDocumentStore();

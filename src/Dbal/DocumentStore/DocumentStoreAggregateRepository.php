@@ -21,11 +21,7 @@ final class DocumentStoreAggregateRepository implements StandardRepository
     {
         $aggregateId = array_pop($identifiers);
 
-        try {
-            return $this->documentStore->getDocument($this->getCollectionName($aggregateClassName), $aggregateId);
-        }catch (DocumentNotFound) {
-            return null;
-        }
+        return $this->documentStore->findDocument($this->getCollectionName($aggregateClassName), $aggregateId);
     }
 
     public function save(array $identifiers, object $aggregate, array $metadata, ?int $versionBeforeHandling): void
