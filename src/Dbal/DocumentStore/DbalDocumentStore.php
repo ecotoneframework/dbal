@@ -58,11 +58,11 @@ final class DbalDocumentStore implements DocumentStore
                     'collection' => Types::STRING,
                     'document_id' => Types::STRING,
                     'document_type' => Types::STRING,
-                    'document' => Types::STRING
+                    'document' => Types::TEXT
                 ]
             );
         }catch (DriverException $driverException) {
-            throw DocumentException::createFromPreviousException(sprintf("Document with id %s can not be added to collection %s", $documentId, $collectionName), $driverException);
+            throw DocumentException::createFromPreviousException(sprintf("Document with id %s can not be added to collection %s. The cause: %s", $documentId, $collectionName, $driverException->getMessage()), $driverException);
         }
 
         if (1 !== $rowsAffected) {

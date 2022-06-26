@@ -2,6 +2,7 @@
 
 namespace Test\Ecotone\Dbal\Recoverability;
 
+use Doctrine\DBAL\Connection;
 use Ecotone\Dbal\Recoverability\DbalDeadLetter;
 use Ecotone\Messaging\Conversion\InMemoryConversionService;
 use Ecotone\Messaging\Handler\MessageHandlingException;
@@ -16,12 +17,24 @@ class DbalDeadLetterTest extends DbalMessagingTest
 {
     protected function setUp(): void
     {
-        $this->getConnectionFactory()->createContext()->getDbalConnection()->beginTransaction();
+        /** @var Connection $connection */
+        $connection = $this->getConnectionFactory()->createContext()->getDbalConnection();
+
+        $connection->executeStatement(sprintf(<<<SQL
+    DROP TABLE IF EXISTS %s
+SQL, DbalDeadLetter::DEFAULT_DEAD_LETTER_TABLE));
+
+        $connection->beginTransaction();
     }
 
     protected function tearDown(): void
     {
-        $this->getConnectionFactory()->createContext()->getDbalConnection()->rollBack();
+        /** @var Connection $dbalConnection */
+        $dbalConnection = $this->getConnectionFactory()->createContext()->getDbalConnection();
+
+        try {
+            $dbalConnection->rollBack();
+        }catch (\Exception) {}
     }
 
     public function __test_retrieving_error_message_details()

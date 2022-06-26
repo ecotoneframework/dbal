@@ -55,7 +55,10 @@ class DbalTransactionInterceptor
             $result = $methodInvocation->proceed();
 
             foreach ($connections as $connection) {
-                $connection->commit();
+                /** Handles the case where Mysql did implicit commit, when new creating tables */
+//                if ($connection->isTransactionActive()) {
+                    $connection->commit();
+//                }
             }
         }catch (\Throwable $exception) {
             foreach ($connections as $connection) {

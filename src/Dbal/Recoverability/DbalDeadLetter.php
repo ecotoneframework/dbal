@@ -153,7 +153,7 @@ class DbalDeadLetter
                 'headers' => \json_encode($this->headerMapper->mapFromMessageHeaders($headers), JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_IGNORE)
             ],
             [
-                'message_id' => Types::TEXT,
+                'message_id' => Types::STRING,
                 'failed_at' => Types::DATETIME_MUTABLE,
                 'payload' => Types::TEXT,
                 'headers' => Types::TEXT
@@ -180,7 +180,7 @@ class DbalDeadLetter
 
         $table = new Table($this->getTableName());
 
-        $table->addColumn('message_id', Types::TEXT);
+        $table->addColumn('message_id', Types::STRING);
         $table->addColumn('failed_at', Types::DATETIME_MUTABLE);
         $table->addColumn('payload', Types::TEXT);
         $table->addColumn('headers', Types::TEXT);

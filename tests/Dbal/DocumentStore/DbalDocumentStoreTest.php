@@ -2,6 +2,7 @@
 
 namespace Test\Ecotone\Dbal\DocumentStore;
 
+use Doctrine\DBAL\Connection;
 use Ecotone\Dbal\DbalReconnectableConnectionFactory;
 use Ecotone\Dbal\DocumentStore\DbalDocumentStore;
 use Ecotone\Enqueue\CachedConnectionFactory;
@@ -24,7 +25,7 @@ final class DbalDocumentStoreTest extends DbalMessagingTest
 
         $documentStore->addDocument('users', '123', '{"name":"Johny"}');
 
-        $this->assertEquals('{"name":"Johny"}', $documentStore->getDocument('users', '123'));
+        $this->assertJsons('{"name":"Johny"}', $documentStore->getDocument('users', '123'));
         $this->assertEquals(1, $documentStore->countDocuments('users'));
     }
 
@@ -36,7 +37,7 @@ final class DbalDocumentStoreTest extends DbalMessagingTest
 
         $documentStore->addDocument('users', '123', '{"name":"Johny"}');
 
-        $this->assertEquals('{"name":"Johny"}', $documentStore->findDocument('users', '123'));
+        $this->assertJsons('{"name":"Johny"}', $documentStore->findDocument('users', '123'));
     }
 
     public function test_updating_document()
@@ -48,7 +49,7 @@ final class DbalDocumentStoreTest extends DbalMessagingTest
         $documentStore->addDocument('users', '123', '{"name":"Johny"}');
         $documentStore->updateDocument('users', '123', '{"name":"Franco"}');
 
-        $this->assertEquals('{"name":"Franco"}', $documentStore->getDocument('users', '123'));
+        $this->assertJsons('{"name":"Franco"}', $documentStore->getDocument('users', '123'));
     }
 
     public function test_adding_document_as_object_should_return_object()
@@ -63,6 +64,13 @@ final class DbalDocumentStoreTest extends DbalMessagingTest
                 MediaType::APPLICATION_JSON,
                 TypeDescriptor::STRING,
                 '{"name":"johny"}'
+            )->registerConversion(
+                '{"name": "johny"}',
+                MediaType::APPLICATION_JSON,
+                TypeDescriptor::STRING,
+                MediaType::APPLICATION_X_PHP,
+                \stdClass::class,
+                new \stdClass()
             )
         );
 
@@ -86,6 +94,13 @@ final class DbalDocumentStoreTest extends DbalMessagingTest
                 MediaType::APPLICATION_JSON,
                 TypeDescriptor::STRING,
                 '[{"name":"johny"},{"name":"franco"}]'
+            )->registerConversion(
+                '[{"name": "johny"}, {"name": "franco"}]',
+                MediaType::APPLICATION_JSON,
+                TypeDescriptor::STRING,
+                MediaType::APPLICATION_X_PHP,
+                TypeDescriptor::createCollection(\stdClass::class),
+                $document
             )
         );
 
@@ -109,6 +124,13 @@ final class DbalDocumentStoreTest extends DbalMessagingTest
                 MediaType::APPLICATION_JSON,
                 TypeDescriptor::STRING,
                 '[1,2,5]'
+            )->registerConversion(
+                '[1, 2, 5]',
+                MediaType::APPLICATION_JSON,
+                TypeDescriptor::STRING,
+                MediaType::APPLICATION_X_PHP,
+                TypeDescriptor::ARRAY,
+                $document
             )
         );
 
@@ -193,7 +215,7 @@ final class DbalDocumentStoreTest extends DbalMessagingTest
         $this->assertEquals([
             '{"name":"Johny"}',
             '{"name":"Franco"}'
-        ], $documentStore->getAllDocuments('users'));
+        ], array_map(fn(string $document) => \json_encode(\json_decode($document, true)),$documentStore->getAllDocuments('users')));
     }
 
     public function test_retrieving_whole_collection_of_objects()
@@ -208,6 +230,13 @@ final class DbalDocumentStoreTest extends DbalMessagingTest
                 MediaType::APPLICATION_JSON,
                 TypeDescriptor::STRING,
                 '{"name":"johny"}'
+            )->registerConversion(
+                '{"name": "johny"}',
+                MediaType::APPLICATION_JSON,
+                TypeDescriptor::STRING,
+                MediaType::APPLICATION_X_PHP,
+                \stdClass::class,
+                new \stdClass()
             )
         );
 
@@ -237,7 +266,7 @@ final class DbalDocumentStoreTest extends DbalMessagingTest
         $documentStore->addDocument('users', '123', '{"name":"Johny"}');
         $documentStore->upsertDocument('users', '123', '{"name":"Johny Mac"}');
 
-        $this->assertEquals('{"name":"Johny Mac"}', $documentStore->getDocument('users', '123'));
+        $this->assertJsons('{"name":"Johny Mac"}', $documentStore->getDocument('users', '123'));
     }
 
     public function test_upserting_new_document()
@@ -248,7 +277,7 @@ final class DbalDocumentStoreTest extends DbalMessagingTest
 
         $documentStore->upsertDocument('users', '123', '{"name":"Johny Mac"}');
 
-        $this->assertEquals('{"name":"Johny Mac"}', $documentStore->getDocument('users', '123'));
+        $this->assertJsons('{"name":"Johny Mac"}', $documentStore->getDocument('users', '123'));
     }
 
     public function test_excepting_if_trying_to_add_document_twice()
@@ -264,12 +293,21 @@ final class DbalDocumentStoreTest extends DbalMessagingTest
     protected function setUp(): void
     {
         $this->cachedConnectionFactory = CachedConnectionFactory::createFor(new DbalReconnectableConnectionFactory($this->getConnectionFactory()));
-        $this->cachedConnectionFactory->createContext()->getDbalConnection()->beginTransaction();
+        /** @var Connection $dbalConnection */
+        $dbalConnection = $this->cachedConnectionFactory->createContext()->getDbalConnection();
+
+        $dbalConnection->executeStatement(sprintf(<<<SQL
+    DROP TABLE IF EXISTS %s
+SQL, DbalDocumentStore::ECOTONE_DOCUMENT_STORE));
+
+        $dbalConnection->beginTransaction();
     }
 
     protected function tearDown(): void
     {
-        $this->cachedConnectionFactory->createContext()->getDbalConnection()->rollBack();
+        try{
+            $this->cachedConnectionFactory->createContext()->getDbalConnection()->rollBack();
+        }catch (\Exception) {}
     }
 
     private function getDocumentStore(): DocumentStore
@@ -279,5 +317,10 @@ final class DbalDocumentStoreTest extends DbalMessagingTest
             true,
             InMemoryConversionService::createWithoutConversion()
         );
+    }
+
+    private function assertJsons(string $expectedJson, string $givenJson): void
+    {
+        $this->assertEquals($expectedJson, \json_encode(\json_decode($givenJson, true)));
     }
 }

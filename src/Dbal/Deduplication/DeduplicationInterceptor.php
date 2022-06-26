@@ -115,9 +115,9 @@ class DeduplicationInterceptor
 
         $table = new Table($this->getTableName());
 
-        $table->addColumn('message_id', Types::TEXT);
+        $table->addColumn('message_id', Types::STRING);
         $table->addColumn('handled_at', Types::BIGINT);
-        $table->addColumn('consumer_endpoint_id', Types::TEXT);
+        $table->addColumn('consumer_endpoint_id', Types::STRING);
 
         $table->setPrimaryKey(['message_id', 'consumer_endpoint_id']);
         $table->addIndex(['handled_at']);

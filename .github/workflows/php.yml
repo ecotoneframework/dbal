@@ -23,8 +23,20 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-    env:
-      DATABASE_DSN: pgsql://ecotone:secret@localhost:5432/ecotone
+      database-mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: "secret"
+          MYSQL_USER: "ecotone"
+          MYSQL_PASSWORD: "secret"
+          MYSQL_DATABASE: "ecotone"
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 3306:3306
     steps:
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
@@ -48,11 +60,25 @@ jobs:
     - name: Install dependencies
       run: composer install --prefer-dist --no-progress
 
-    - name: Test PHPUnit
+    - name: Test PHPUnit on Postgres
       run: vendor/bin/phpunit
+      env:
+        DATABASE_DSN: pgsql://ecotone:secret@localhost:5432/ecotone
 
-    - name: Test Behat
+    - name: Test Behat on Postgres
       run: vendor/bin/behat
+      env:
+        DATABASE_DSN: pgsql://ecotone:secret@localhost:5432/ecotone
+
+    - name: Test PHPUnit on Mysql
+      run: vendor/bin/phpunit
+      env:
+        DATABASE_DSN: mysql://ecotone:secret@localhost/ecotone
+
+    - name: Test Behat on Mysql
+      run: vendor/bin/behat
+      env:
+        DATABASE_DSN: mysql://ecotone:secret@localhost/ecotone
 
     - name: Test PHPStan
       run: vendor/bin/phpstan
