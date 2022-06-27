@@ -23,7 +23,7 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-      database-mysql:
+      mysql:
         image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: "secret"
@@ -69,12 +69,12 @@ jobs:
     - name: Test PHPUnit on Mysql
       run: vendor/bin/phpunit
       env:
-        DATABASE_DSN: mysql://ecotone:secret@database-mysql/ecotone
+        DATABASE_DSN: mysql://ecotone:secret@mysql/ecotone
 
     - name: Test Behat on Mysql
       run: vendor/bin/behat
       env:
-        DATABASE_DSN: mysql://ecotone:secret@database-mysql/ecotone
+        DATABASE_DSN: mysql://ecotone:secret@mysql/ecotone
 
     - name: Test PHPStan
       run: vendor/bin/phpstan
