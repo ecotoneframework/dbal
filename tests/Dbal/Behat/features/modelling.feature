@@ -2,15 +2,42 @@ Feature: activating as aggregate order entity
 
   Scenario: I order with transaction a product with failure, so the order should never be committed to database
     Given I active messaging for namespace "Test\Ecotone\Dbal\Fixture\Transaction"
+#    this is step for non ddl transactional databases
+    And table is prepared
+    And there should 0 registered orders
     When I transactionally order "milk"
     Then there should 0 registered orders
 
-  Scenario: I order with transaction a product with failure, so the order should never be comitted to database using asynchronous consumer
+  Scenario: Handles rollback transaction that was caused by non DDL statement ending with failure later
+    Given I active messaging for namespace "Test\Ecotone\Dbal\Fixture\Transaction"
+    When it fails prepare table
+    And there should 0 registered orders
+    When I transactionally order "milk"
+    Then there should 0 registered orders
+
+  Scenario: When it fails at second time to add the order, it will rollback the message
     Given I active messaging for namespace "Test\Ecotone\Dbal\Fixture\AsynchronousChannelTransaction"
+    When I transactionally order "milk"
+    Then there should 0 registered orders
+    And I call pollable endpoint "orders"
+    And I call pollable endpoint "processOrders"
+    Then there should 1 registered orders
     When I transactionally order "milk"
     And I call pollable endpoint "orders"
     And I call pollable endpoint "processOrders"
-    Then there should 0 registered orders
+    Then there should 1 registered orders
+
+  Scenario: Handles commit transaction that were ended by implicit commit. Test for non DDL transactional databases
+    Given I active messaging for namespace "Test\Ecotone\Dbal\Fixture\AsynchronousChannelTransaction"
+    When I transactionally order "milk" with table creation
+    And I call pollable endpoint "orders"
+    And I call pollable endpoint "processOrders"
+    Then there should 1 registered orders
+
+  Scenario: Handles rollback transaction that was caused by non DDL statement with success later
+    Given I active messaging for namespace "Test\Ecotone\Dbal\Fixture\AsynchronousChannelTransaction"
+    When it fails prepare table
+    When I transactionally order "milk"
     And I call pollable endpoint "orders"
     And I call pollable endpoint "processOrders"
     Then there should 1 registered orders

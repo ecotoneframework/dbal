@@ -79,15 +79,16 @@ SQL, DbalDeadLetter::DEFAULT_DEAD_LETTER_TABLE));
                                     ErrorContext::EXCEPTION_LINE => 120,
                                     ErrorContext::EXCEPTION_FILE => "dbalDeadLetter.php",
                                     ErrorContext::EXCEPTION_CODE => 1,
-                                    ErrorContext::EXCEPTION_MESSAGE => 1,
+                                    ErrorContext::EXCEPTION_MESSAGE => "some",
                                 ])
                                 ->build();
         $dbalDeadLetter->store(MessageBuilder::withPayload("error2")->build());
+        sleep(2);
         $dbalDeadLetter->store($secondErrorMessage);
 
         $this->assertEquals(
             [ErrorContext::fromHeaders($secondErrorMessage->getHeaders()->headers())],
-            $dbalDeadLetter->list(1, 1)
+            $dbalDeadLetter->list(1, 0)
         );
     }
 

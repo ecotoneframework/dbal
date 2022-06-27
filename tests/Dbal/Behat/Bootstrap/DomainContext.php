@@ -135,17 +135,10 @@ SQL);
 
     private function deleteFromTableExists(string $tableName, \Doctrine\DBAL\Connection $connection) : void
     {
-        $doesExists = $connection->executeQuery(
-            <<<SQL
-SELECT EXISTS (
-   SELECT FROM information_schema.tables 
-   WHERE  table_name   = :tableName
-   );
-SQL, ["tableName" => $tableName]
-        )->fetchOne();
+        $doesExists = $this->checkIfTableExists($connection, $tableName);
 
         if ($doesExists) {
-            $connection->executeUpdate("DELETE FROM " . $tableName);
+            $connection->executeStatement("DELETE FROM " . $tableName);
         }
     }
 
@@ -268,21 +261,15 @@ SQL, ["tableName" => $tableName]
 
     /**
      * @param \Doctrine\DBAL\Connection $connection
-     * @param string $enqueueTable
+     * @param string $table
      * @return false|mixed
      * @throws \Doctrine\DBAL\Exception
      */
-    private function checkIfTableExists(\Doctrine\DBAL\Connection $connection, string $enqueueTable): mixed
+    private function checkIfTableExists(\Doctrine\DBAL\Connection $connection, string $table): mixed
     {
-        $isTableExists = $connection->executeQuery(
-            <<<SQL
-SELECT EXISTS (
-   SELECT FROM information_schema.tables 
-   WHERE  table_name   = :tableName
-   );
-SQL, ["tableName" => $enqueueTable]
-        )->fetchOne();
-        return $isTableExists;
+        $schemaManager = $connection->createSchemaManager();
+
+        return $schemaManager->tablesExist([$table]);
     }
 
     /**
@@ -323,11 +310,11 @@ SQL, ["tableName" => $enqueueTable]
     {
         Assert::assertEquals(
             $this->convertOrderToJson($order),
-            $this->getDocumentStore()->getDocument($shopName, $orderId)
+            \json_encode(\json_decode($this->getDocumentStore()->getDocument($shopName, $orderId)))
         );
         Assert::assertEquals(
             $this->convertOrderToJson($order),
-            $this->getDocumentStore()->findDocument($shopName, $orderId)
+            \json_encode(\json_decode($this->getDocumentStore()->findDocument($shopName, $orderId), true))
         );
     }
 
@@ -386,5 +373,42 @@ SQL, ["tableName" => $enqueueTable]
             $name,
             $this->getQueryBus()->sendWithRouting("person.getName", metadata: ["aggregate.id" => $id])
         );
+    }
+
+    /**
+     * @When I transactionally order :order with table creation
+     */
+    public function iTransactionallyOrderWithTableCreation(string $order)
+    {
+        /** @var CommandBus $commandBus */
+        $commandBus = self::$messagingSystem->getGatewayByName(CommandBus::class);
+
+        try {
+            $commandBus->sendWithRouting("order.register_with_table_creation", $order);
+        }catch (\InvalidArgumentException $e) {}
+    }
+
+    /**
+     * @Given table is prepared
+     */
+    public function tableIsPrepared()
+    {
+        /** @var CommandBus $commandBus */
+        $commandBus = self::$messagingSystem->getGatewayByName(CommandBus::class);
+
+        $commandBus->sendWithRouting("order.prepare");
+    }
+
+    /**
+     * @When it fails prepare table
+     */
+    public function itFailsPrepareTable()
+    {
+        /** @var CommandBus $commandBus */
+        $commandBus = self::$messagingSystem->getGatewayByName(CommandBus::class);
+
+        try {
+            $commandBus->sendWithRouting("order.prepareWithFailure");
+        }catch (\Exception) {}
     }
 }

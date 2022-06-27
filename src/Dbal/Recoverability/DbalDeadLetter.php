@@ -46,6 +46,7 @@ class DbalDeadLetter
             ->from($this->getTableName())
             ->setMaxResults($limit)
             ->setFirstResult($offset)
+            ->orderBy('failed_at', 'desc')
             ->execute()
             ->fetchAll();
 

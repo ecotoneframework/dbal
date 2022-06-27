@@ -17,14 +17,41 @@ class OrderService
 {
     const ORDER_TABLE = "orders";
 
+    #[CommandHandler("order.prepare")]
+    public function prepare(#[Reference(DbalConnectionFactory::class)] ManagerRegistryConnectionFactory $connectionFactory)
+    {
+        $connection = $connectionFactory->createContext()->getDbalConnection();
+
+        $connection->executeStatement(<<<SQL
+    DROP TABLE IF EXISTS orders
+SQL);
+        $connection->executeStatement(<<<SQL
+    CREATE TABLE orders (id VARCHAR(255) PRIMARY KEY)
+SQL);
+    }
+
+    #[CommandHandler("order.prepareWithFailure")]
+    public function prepareWithFailure(#[Reference(DbalConnectionFactory::class)] ManagerRegistryConnectionFactory $connectionFactory)
+    {
+        $connection = $connectionFactory->createContext()->getDbalConnection();
+
+        $connection->executeStatement(<<<SQL
+    DROP TABLE IF EXISTS orders
+SQL);
+        $connection->executeStatement(<<<SQL
+    CREATE TABLE orders (id VARCHAR(255) PRIMARY KEY)
+SQL);
+
+        $connection->executeStatement(<<<SQL
+    CREATE TABLE WITH FAILURE SYNTAX orders2 (id VARCHAR(255) PRIMARY KEY)
+SQL);
+    }
+
     #[CommandHandler("order.register")]
     public function register(string $order, #[Reference(DbalConnectionFactory::class)] ManagerRegistryConnectionFactory $connectionFactory): void
     {
         $connection = $connectionFactory->createContext()->getDbalConnection();
 
-        $connection->executeStatement(<<<SQL
-    CREATE TABLE IF NOT EXISTS orders (id VARCHAR(255) PRIMARY KEY)
-SQL);
         $connection->executeStatement(<<<SQL
     INSERT INTO orders VALUES (:order)
 SQL, ["order" => $order]);
@@ -50,15 +77,8 @@ SQL)->fetchFirstColumn();
 
     private function doesTableExists(\Doctrine\DBAL\Connection $connection)
     {
-        $isTableExists = $connection->executeQuery(
-            <<<SQL
-SELECT EXISTS (
-   SELECT FROM information_schema.tables 
-   WHERE  table_name   = 'orders'
-   );
-SQL
-        )->fetchOne();
+        $schemaManager = $connection->createSchemaManager();
 
-        return $isTableExists;
+        return $schemaManager->tablesExist(['orders']);
     }
 }

@@ -28,6 +28,9 @@ class ChannelConfiguration
                 ->withTransactionOnAsynchronousEndpoints(true)
                 ->withTransactionOnCommandBus(true)
                 ->withDefaultConnectionReferenceNames(["managerRegistry"])
+                ->withDocumentStore(false)
+                ->withDeduplication(false)
+                ->withDeadLetter(false)
         ];
     }
 
