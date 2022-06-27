@@ -18,7 +18,7 @@ jobs:
           MYSQL_USER: "ecotone"
           MYSQL_PASSWORD: "secret"
           MYSQL_DATABASE: "ecotone"
-          DB_PORT: ${{ job.services.mysql.ports[3306] }}
+          DB_PORT: 3306
         options: >-
           --health-cmd="mysqladmin ping"
           --health-interval=10s
@@ -40,8 +40,7 @@ jobs:
           - 5432:5432
     steps:
     - name: Verify MySQL connection
-        run: |
-          mysql --host 127.0.0.1 --port ${{ job.services.mysql.ports['3306'] }} -uuser -psecret -e "SHOW DATABASES"
+        run: mysql --host 127.0.0.1 --port 3306 -uuser -psecret -e "SHOW DATABASES"
 
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
