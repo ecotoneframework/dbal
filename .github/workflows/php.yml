@@ -69,12 +69,12 @@ jobs:
     - name: Test PHPUnit on Mysql
       run: vendor/bin/phpunit
       env:
-        DATABASE_DSN: mysql://ecotone:secret@mysql/ecotone
+        DATABASE_DSN: mysql://ecotone:secret@localhost:3306/ecotone
 
     - name: Test Behat on Mysql
       run: vendor/bin/behat
       env:
-        DATABASE_DSN: mysql://ecotone:secret@mysql/ecotone
+        DATABASE_DSN: mysql://ecotone:secret@localhost:3306/ecotone
 
     - name: Test PHPStan
       run: vendor/bin/phpstan
