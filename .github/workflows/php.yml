@@ -66,6 +66,9 @@ jobs:
       env:
         DATABASE_DSN: pgsql://ecotone:secret@localhost:5432/ecotone
 
+    - name: wait for mysql
+      run: sleep 60
+
     - name: Test PHPUnit on Mysql
       run: vendor/bin/phpunit
       env:
