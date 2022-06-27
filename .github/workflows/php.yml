@@ -39,9 +39,6 @@ jobs:
         ports:
           - 5432:5432
     steps:
-    - name: Verify MySQL connection
-        run: mysql --host 127.0.0.1 --port 3306 -uuser -psecret -e "SHOW DATABASES"
-
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
       with:
@@ -51,7 +48,10 @@ jobs:
     
     - name: Validate composer.json and composer.lock
       run: composer validate
-    
+
+    - name: Verify MySQL connection
+      run: mysql --host 127.0.0.1 --port 3306 -uuser -psecret -e "SHOW DATABASES"
+
     - name: Cache Composer packages
       id: composer-cache
       uses: actions/cache@v2
