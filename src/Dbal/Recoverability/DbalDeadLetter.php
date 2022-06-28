@@ -63,7 +63,7 @@ class DbalDeadLetter
             ->from($this->getTableName())
             ->andWhere('message_id = :messageId')
             ->setParameter('messageId', $messageId, Types::TEXT)
-            ->orderBy("failed_at", "ASC")
+            ->orderBy("failed_at", "DESC")
             ->setMaxResults(1)
             ->execute()
             ->fetch();
