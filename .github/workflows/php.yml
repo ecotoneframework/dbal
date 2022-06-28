@@ -50,7 +50,7 @@ jobs:
       run: composer validate
 
     - name: Verify MySQL connection
-      run: mysql --host 127.0.0.1 --port 3306 -uuser -psecret -e "SHOW DATABASES"
+      run: mysql --host 127.0.0.1 --port 3306 -uecotone -psecret -e "SHOW DATABASES"
 
     - name: Cache Composer packages
       id: composer-cache
