@@ -49,9 +49,6 @@ jobs:
     - name: Validate composer.json and composer.lock
       run: composer validate
 
-    - name: Verify MySQL connection
-      run: mysql --host 127.0.0.1 --port 3306 -uecotone -psecret -e "SHOW DATABASES"
-
     - name: Cache Composer packages
       id: composer-cache
       uses: actions/cache@v2
@@ -74,18 +71,18 @@ jobs:
       env:
         DATABASE_DSN: pgsql://ecotone:secret@localhost:5432/ecotone
 
-    - name: wait for mysql
-      run: sleep 60
+    - name: Verify MySQL connection
+      run: mysql --host 127.0.0.1 --port 3306 -uecotone -psecret -e "SHOW DATABASES"
 
     - name: Test PHPUnit on Mysql
       run: vendor/bin/phpunit
       env:
-        DATABASE_DSN: mysql://ecotone:secret@localhost:3306/ecotone
+        DATABASE_DSN: mysql://ecotone:secret@127.0.0.1:3306/ecotone
 
     - name: Test Behat on Mysql
       run: vendor/bin/behat
       env:
-        DATABASE_DSN: mysql://ecotone:secret@localhost:3306/ecotone
+        DATABASE_DSN: mysql://ecotone:secret@127.0.0.1:3306/ecotone
 
     - name: Test PHPStan
       run: vendor/bin/phpstan
