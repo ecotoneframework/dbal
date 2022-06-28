@@ -73,7 +73,7 @@ SQL, DbalDeadLetter::DEFAULT_DEAD_LETTER_TABLE));
     {
         $dbalDeadLetter = new DbalDeadLetter($this->getConnectionFactory(), DefaultHeaderMapper::createAllHeadersMapping(InMemoryConversionService::createWithoutConversion()));
 
-        $secondErrorMessage = MessageBuilder::withPayload("error1")
+        $errorMessage = MessageBuilder::withPayload("error1")
                                 ->setMultipleHeaders([
                                     ErrorContext::EXCEPTION_STACKTRACE => "#12",
                                     ErrorContext::EXCEPTION_LINE => 120,
@@ -82,12 +82,10 @@ SQL, DbalDeadLetter::DEFAULT_DEAD_LETTER_TABLE));
                                     ErrorContext::EXCEPTION_MESSAGE => "some",
                                 ])
                                 ->build();
-        $dbalDeadLetter->store(MessageBuilder::withPayload("error2")->build());
-        sleep(2);
-        $dbalDeadLetter->store($secondErrorMessage);
+        $dbalDeadLetter->store($errorMessage);
 
         $this->assertEquals(
-            [ErrorContext::fromHeaders($secondErrorMessage->getHeaders()->headers())],
+            [ErrorContext::fromHeaders($errorMessage->getHeaders()->headers())],
             $dbalDeadLetter->list(1, 0)
         );
     }
