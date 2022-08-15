@@ -104,7 +104,7 @@ class DbalConnection implements ManagerRegistry
     }
 
     /**
-     * {@inheritdoc}
+     * @throws InvalidArgumentException
      */
     public function getAliasNamespace($alias): string
     {
