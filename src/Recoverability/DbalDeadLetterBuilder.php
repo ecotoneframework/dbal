@@ -26,6 +26,7 @@ class DbalDeadLetterBuilder extends InputOutputMessageHandlerBuilder
 
     public const LIST_CHANNEL  = 'ecotone.dbal.deadletter.list';
     public const SHOW_CHANNEL       = 'ecotone.dbal.deadletter.show';
+    public const COUNT_CHANNEL       = 'ecotone.dbal.deadletter.count';
     public const REPLAY_CHANNEL     = 'ecotone.dbal.deadletter.reply';
     public const REPLAY_ALL_CHANNEL = 'ecotone.dbal.deadletter.replyAll';
     public const DELETE_CHANNEL     = 'ecotone.dbal.deadletter.delete';
@@ -45,7 +46,7 @@ class DbalDeadLetterBuilder extends InputOutputMessageHandlerBuilder
 
     public static function getChannelName(string $connectionReferenceName, string $actionChannel): string
     {
-        return $connectionReferenceName . "." . $actionChannel;
+        return $connectionReferenceName . '.' . $actionChannel;
     }
 
     public static function createList(string $connectionReferenceName): self
@@ -63,17 +64,30 @@ class DbalDeadLetterBuilder extends InputOutputMessageHandlerBuilder
 
     public static function createShow(string $connectionReferenceName): self
     {
-        return new self('show', $connectionReferenceName,
-            self::getChannelName($connectionReferenceName,     self::SHOW_CHANNEL),
-        [
-            PayloadBuilder::create('messageId'),
-            HeaderBuilder::createOptional('replyChannel', MessageHeaders::REPLY_CHANNEL),
-        ]);
+        return new self(
+            'show',
+            $connectionReferenceName,
+            self::getChannelName($connectionReferenceName, self::SHOW_CHANNEL),
+            [
+                PayloadBuilder::create('messageId'),
+                HeaderBuilder::createOptional('replyChannel', MessageHeaders::REPLY_CHANNEL),
+            ]
+        );
+    }
+
+    public static function createCount(string $connectionReferenceName): self
+    {
+        return new self('count', $connectionReferenceName,
+            self::getChannelName($connectionReferenceName,     self::COUNT_CHANNEL),
+            []
+        );
     }
 
     public static function createReply(string $connectionReferenceName): self
     {
-        return new self('reply', $connectionReferenceName,
+        return new self(
+            'reply',
+            $connectionReferenceName,
             self::getChannelName($connectionReferenceName, self::REPLAY_CHANNEL),
             []
         );
@@ -93,7 +107,9 @@ class DbalDeadLetterBuilder extends InputOutputMessageHandlerBuilder
 
     public static function createDelete(string $connectionReferenceName): self
     {
-        return new self('delete', $connectionReferenceName,
+        return new self(
+            'delete',
+            $connectionReferenceName,
             self::getChannelName($connectionReferenceName, self::DELETE_CHANNEL),
             []
         );
@@ -101,7 +117,9 @@ class DbalDeadLetterBuilder extends InputOutputMessageHandlerBuilder
 
     public static function createStore(string $connectionReferenceName): self
     {
-        return new self('store', $connectionReferenceName,
+        return new self(
+            'store',
+            $connectionReferenceName,
             self::STORE_CHANNEL,
             []
         );
