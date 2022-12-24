@@ -1,5 +1,5 @@
 {
-    "name": "ecotone/dbal",
+    "name": "ecotone/sqs",
     "license": "MIT",
     "homepage": "https://docs.ecotone.tech/",
     "forum": "https://discord.gg/CctGMcrYnV",
@@ -13,35 +13,30 @@
         }
     ],
     "keywords": [
-        "dbal",
-        "ecotone"
+        "ecotone",
+        "Sqs"
     ],
-    "description": "Extends Ecotone with Dbal integration",
+    "description": "Extends Ecotone with Amazon Sqs integration",
     "autoload": {
         "psr-4": {
-            "Ecotone\\Dbal\\": "src"
+            "Ecotone\\Sqs\\": "src"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Test\\Ecotone\\Dbal\\": [
+            "Test\\Ecotone\\Sqs\\": [
                 "tests"
             ]
         }
     },
     "require": {
         "ecotone/enqueue": "^1.63",
-        "enqueue/dbal": "^0.10.17",
-        "doctrine/dbal": "^3.3.7"
+        "enqueue/sqs": "^0.10.15"
     },
     "require-dev": {
         "phpunit/phpunit": "^9.5",
         "behat/behat": "^3.10",
-        "doctrine/persistence": "^2.5",
         "phpstan/phpstan": "^1.8",
-        "doctrine/orm": "^2.0|^3.0",
-        "doctrine/cache": "^1.0.0",
-        "doctrine/annotations": "^1.13",
         "wikimedia/composer-merge-plugin": "^2.0"
     },
     "scripts": {
