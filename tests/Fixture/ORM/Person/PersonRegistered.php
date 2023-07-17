@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Test\Ecotone\Dbal\Fixture\ORM;
+namespace Test\Ecotone\Dbal\Fixture\ORM\Person;
 
-class RegisterPerson
+final class PersonRegistered
 {
     public function __construct(private int $personId, private string $name)
     {
