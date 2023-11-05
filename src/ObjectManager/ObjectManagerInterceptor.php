@@ -5,9 +5,10 @@ namespace Ecotone\Dbal\ObjectManager;
 use Doctrine\Persistence\ManagerRegistry;
 use Ecotone\Dbal\DbalReconnectableConnectionFactory;
 use Ecotone\Messaging\Attribute\Parameter\Reference;
+use Ecotone\Messaging\Handler\Logger\LoggingGateway;
 use Ecotone\Messaging\Handler\Processor\MethodInvoker\MethodInvocation;
+use Ecotone\Messaging\Message;
 use Enqueue\Dbal\ManagerRegistryConnectionFactory;
-use Psr\Log\LoggerInterface;
 use Throwable;
 
 class ObjectManagerInterceptor
@@ -21,7 +22,7 @@ class ObjectManagerInterceptor
     {
     }
 
-    public function transactional(MethodInvocation $methodInvocation, #[Reference] LoggerInterface $logger)
+    public function transactional(MethodInvocation $methodInvocation, Message $message, #[Reference] LoggingGateway $logger)
     {
         /** @var ManagerRegistry[] $objectManagers */
         $objectManagers = [];
@@ -47,7 +48,10 @@ class ObjectManagerInterceptor
             }
 
             if (count($objectManagers) > 0) {
-                $logger->info('Flushed and cleared doctrine object managers');
+                $logger->info(
+                    'Flushed and cleared doctrine object managers',
+                    $message
+                );
             }
         } catch (Throwable $exception) {
             foreach ($objectManagers as $objectManager) {
@@ -56,7 +60,10 @@ class ObjectManagerInterceptor
                 }
             }
             if (count($objectManagers) > 0) {
-                $logger->info('Cleared doctrine object managers');
+                $logger->info(
+                    'Cleared doctrine object managers',
+                    $message
+                );
             }
 
             throw $exception;
