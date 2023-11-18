@@ -38,6 +38,42 @@ final class TransactionTest extends DbalMessagingTestCase
         self::assertCount(0, $ecotone->sendQueryWithRouting('order.getRegistered'));
     }
 
+    public function test_transactions_from_existing_transaction(): void
+    {
+        $connection = $this->getConnection();
+        $connection->close();
+
+        $ecotone = EcotoneLite::bootstrapFlowTesting(
+            containerOrAvailableServices: [
+                new OrderService(),
+                DbalConnectionFactory::class => DbalConnection::create(
+                    $connection
+                ),
+            ],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withEnvironment('prod')
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::ASYNCHRONOUS_PACKAGE]))
+                ->withNamespaces([
+                    'Test\Ecotone\Dbal\Fixture\Transaction',
+                ]),
+            pathToRootCatalog: __DIR__ . '/../../',
+        );
+
+        try {
+            $ecotone->sendCommandWithRoutingKey('order.prepare');
+        } catch (Throwable) {
+        }
+
+        self::assertCount(0, $ecotone->sendQueryWithRouting('order.getRegistered'));
+
+        try {
+            $ecotone->sendCommandWithRoutingKey('order.register', 'milk');
+        } catch (Throwable) {
+        }
+
+        self::assertCount(0, $ecotone->sendQueryWithRouting('order.getRegistered'));
+    }
+
     public function test_handling_rollback_transaction_that_was_caused_by_non_ddl_statement_ending_with_failure_later(): void
     {
         $ecotone = $this->bootstrapEcotone();
