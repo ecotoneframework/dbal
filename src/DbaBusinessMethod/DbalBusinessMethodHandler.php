@@ -28,6 +28,8 @@ final class DbalBusinessMethodHandler
     public const HEADER_PARAMETER_VALUE_PREFIX = 'ecotone.dbal.business_method.parameter.value.';
     public const HEADER_PARAMETER_TYPE_PREFIX = 'ecotone.dbal.business_method.parameter.type.';
 
+    private const SQL_EXPRESSION_PARAMETERS_REGEX = '#:\(([^\)]+)\)#';
+
     public function __construct(
         private ConnectionFactory $connectionFactory,
         private ConversionService $conversionService,
@@ -42,7 +44,8 @@ final class DbalBusinessMethodHandler
         int    $fetchMode,
         array  $headers
     ): ?Message {
-        [$parameters, $parameterTypes] = $this->getParameters($headers);
+        [$sql, $parameters, $parameterTypes] = $this->prepareExecution($sql, $headers);
+
         $query = $this->getConnection()->executeQuery($sql, $parameters, $parameterTypes);
 
         $result = match($fetchMode) {
@@ -65,15 +68,15 @@ final class DbalBusinessMethodHandler
 
     public function executeWrite(string $sql, array $headers): int
     {
-        [$parameters, $parameterTypes] = $this->getParameters($headers);
+        [$sql, $parameters, $parameterTypes] = $this->prepareExecution($sql, $headers);
 
         return $this->getConnection()->executeStatement($sql, $parameters, $parameterTypes);
     }
 
     /**
-     * @return array<array<string, mixed>, array<string, string>>
+     * @return array<string, array<string, mixed>, array<string, string>>
      */
-    private function getParameters(array $headers): array
+    private function prepareExecution(string $sql, array $headers): array
     {
         /** @var array<string, DbalParameter> $parameterTypes */
         $parameterTypes = [];
@@ -102,10 +105,6 @@ final class DbalBusinessMethodHandler
                 $dbalParameter = $parameterTypes[$parameterName];
                 unset($parameterTypes[$parameterName]);
 
-                if ($dbalParameter->isIgnored()) {
-                    continue;
-                }
-
                 $parameterValue = $this->getParameterValue($dbalParameter, ['payload' => $parameterValue], $parameterValue);
                 if ($dbalParameter->getName()) {
                     $parameterName = $dbalParameter->getName();
@@ -127,7 +126,18 @@ final class DbalBusinessMethodHandler
             }
         }
 
-        return [$preparedParameters, $this->autoResolveTypesIfNeeded($preparedParameters, $preparedParameterTypes)];
+        preg_match_all(self::SQL_EXPRESSION_PARAMETERS_REGEX, $sql, $matches);
+        foreach ($matches[1] as $key => $expression) {
+            $parameterNameGenerated = 'ecotone_parameter_' . $key;
+
+            $preparedParameters[$parameterNameGenerated] = $this->expressionEvaluationService->evaluate(
+                $expression,
+                $originalParameters
+            );
+            $sql = str_replace($matches[0][$key], ':' . $parameterNameGenerated, $sql);
+        }
+
+        return [$sql, $preparedParameters, $this->autoResolveTypesIfNeeded($preparedParameters, $preparedParameterTypes)];
     }
 
     private function getConnection(): Connection
