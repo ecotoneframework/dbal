@@ -17,6 +17,10 @@ use Test\Ecotone\Dbal\Fixture\Transaction\OrderService;
 
 abstract class DbalMessagingTestCase extends TestCase
 {
+    private ConnectionFactory $tenantAConnection;
+    private ConnectionFactory $tenantBConnection;
+    private static ?DbalConnectionFactory $defaultConnection = null;
+
     public function getConnectionFactory(bool $isRegistry = false): ConnectionFactory
     {
         $dbalConnectionFactory = self::prepareConnection();
@@ -27,19 +31,23 @@ abstract class DbalMessagingTestCase extends TestCase
 
     public static function prepareConnection(): DbalConnectionFactory
     {
-        $dsn = getenv('DATABASE_DSN') ? getenv('DATABASE_DSN') : 'pgsql://ecotone:secret@localhost:5432/ecotone';
+        if (null !== self::$defaultConnection && self::$defaultConnection->createContext()->getDbalConnection()->isConnected()) {
+            return self::$defaultConnection;
+        }
 
-        return new DbalConnectionFactory($dsn);
+        $dsn = getenv('DATABASE_DSN') ? getenv('DATABASE_DSN') : 'pgsql://ecotone:secret@localhost:5432/ecotone';
+        $dbalConnection = new DbalConnectionFactory($dsn);
+        self::$defaultConnection = $dbalConnection;
+
+        return $dbalConnection;
     }
 
     /**
      * @param string[] $pathsToMapping
      */
-    public function getORMConnectionFactory(array $pathsToMapping): EcotoneManagerRegistryConnectionFactory
+    public function getORMConnectionFactory(array $pathsToMapping, ?Connection $connection = null): EcotoneManagerRegistryConnectionFactory
     {
-        return new EcotoneManagerRegistryConnectionFactory(
-            new ManagerRegistryEmulator($this->getConnection(), $pathsToMapping)
-        );
+        return ManagerRegistryEmulator::create($connection ?? $this->getConnection(), $pathsToMapping);
     }
 
     protected function getConnection(): Connection
@@ -54,15 +62,24 @@ abstract class DbalMessagingTestCase extends TestCase
 
     public function setUp(): void
     {
-        $connection = $this->getConnection();
+        /** @var ConnectionFactory $connection */
+        foreach ([$this->connectionForTenantA(), $this->connectionForTenantB()] as $connection) {
+            $connection = $connection->createContext()->getDbalConnection();
 
-        $this->deleteTable('enqueue', $connection);
-        $this->deleteTable(OrderService::ORDER_TABLE, $connection);
-        $this->deleteTable(DbalDeadLetterHandler::DEFAULT_DEAD_LETTER_TABLE, $connection);
-        $this->deleteTable(DbalDocumentStore::ECOTONE_DOCUMENT_STORE, $connection);
-        $this->deleteTable(DeduplicationInterceptor::DEFAULT_DEDUPLICATION_TABLE, $connection);
-        $this->deleteTable('persons', $connection);
-        $this->deleteTable('activities', $connection);
+            $this->deleteTable('enqueue', $connection);
+            $this->deleteTable(OrderService::ORDER_TABLE, $connection);
+            $this->deleteTable(DbalDeadLetterHandler::DEFAULT_DEAD_LETTER_TABLE, $connection);
+            $this->deleteTable(DbalDocumentStore::ECOTONE_DOCUMENT_STORE, $connection);
+            $this->deleteTable(DeduplicationInterceptor::DEFAULT_DEDUPLICATION_TABLE, $connection);
+            $this->deleteTable('persons', $connection);
+            $this->deleteTable('activities', $connection);
+        }
+    }
+
+    public function tearDown(): void
+    {
+        $this->connectionForTenantA()->createContext()->getDbalConnection()->close();
+        $this->connectionForTenantB()->createContext()->getDbalConnection()->close();
     }
 
     protected function checkIfTableExists(Connection $connection, string $table): bool
@@ -81,17 +98,19 @@ abstract class DbalMessagingTestCase extends TestCase
         }
     }
 
-    protected function setupUserTable(): void
+    protected function setupUserTable(?Connection $connection = null): void
     {
-        if (! $this->checkIfTableExists($this->getConnection(), 'persons')) {
-            $this->getConnection()->executeStatement(<<<SQL
-                    CREATE TABLE persons (
-                        person_id INTEGER PRIMARY KEY,
-                        name VARCHAR(255),
-                        roles VARCHAR(255) DEFAULT '[]'
-                    )
-                SQL);
-        }
+        $connection ??= $this->getConnection();
+        $connection->executeStatement(<<<SQL
+                    DROP TABLE IF EXISTS persons
+            SQL);
+        $connection->executeStatement(<<<SQL
+                CREATE TABLE persons (
+                    person_id INTEGER PRIMARY KEY,
+                    name VARCHAR(255),
+                    roles VARCHAR(255) DEFAULT '[]'
+                )
+            SQL);
     }
 
     protected function setupActivityTable(): void
@@ -105,5 +124,46 @@ abstract class DbalMessagingTestCase extends TestCase
                     )
                 SQL);
         }
+    }
+
+    protected function connectionForTenantB(): ConnectionFactory
+    {
+        if (isset($this->tenantBConnection)) {
+            return $this->tenantBConnection;
+        }
+
+        $connectionFactory = DbalConnection::fromDsn(
+            getenv('SECONDARY_DATABASE_DSN') ? getenv('SECONDARY_DATABASE_DSN') : 'mysql://ecotone:secret@localhost:3306/ecotone'
+        );
+
+        $this->tenantBConnection = $connectionFactory;
+        return $connectionFactory;
+    }
+
+    protected function connectionForTenantA(): ConnectionFactory
+    {
+        $connectionFactory = self::prepareConnection();
+        if (isset($this->tenantAConnection)) {
+            return $this->tenantAConnection;
+        }
+
+        $this->tenantAConnection = $connectionFactory;
+        return $connectionFactory;
+    }
+
+    protected function connectionForTenantAWithManagerRegistry(array $paths): EcotoneManagerRegistryConnectionFactory
+    {
+        return ManagerRegistryEmulator::create(
+            $this->connectionForTenantA()->createContext()->getDbalConnection(),
+            $paths
+        );
+    }
+
+    protected function connectionForTenantBWithManagerRegistry(array $paths): EcotoneManagerRegistryConnectionFactory
+    {
+        return ManagerRegistryEmulator::create(
+            $this->connectionForTenantB()->createContext()->getDbalConnection(),
+            $paths
+        );
     }
 }
