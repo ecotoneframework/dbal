@@ -84,9 +84,7 @@ abstract class DbalMessagingTestCase extends TestCase
 
     protected function checkIfTableExists(Connection $connection, string $table): bool
     {
-        $schemaManager = method_exists($connection, 'getSchemaManager') ? $connection->getSchemaManager() : $connection->createSchemaManager();
-
-        return $schemaManager->tablesExist([$table]);
+        return $this->getSchemaManager($connection)->tablesExist([$table]);
     }
 
     private function deleteTable(string $tableName, Connection $connection): void
@@ -165,5 +163,10 @@ abstract class DbalMessagingTestCase extends TestCase
             $this->connectionForTenantB()->createContext()->getDbalConnection(),
             $paths
         );
+    }
+
+    private function getSchemaManager(Connection $connection): ?\Doctrine\DBAL\Schema\AbstractSchemaManager
+    {
+        return method_exists($connection, 'getSchemaManager') ? $connection->getSchemaManager() : $connection->createSchemaManager();
     }
 }

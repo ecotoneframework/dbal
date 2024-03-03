@@ -13,8 +13,11 @@ use Interop\Queue\ConnectionFactory;
 
 class ManagerRegistryRepository implements StandardRepository
 {
-    public function __construct(private ConnectionFactory $connectionFactory, private ?array $relatedClasses)
-    {
+    public function __construct(
+        private ConnectionFactory $connectionFactory,
+        private ?array $relatedClasses,
+        private bool $autoFlushOnCommand
+    ) {
     }
 
     public function canHandle(string $aggregateClassName): bool
@@ -36,6 +39,9 @@ class ManagerRegistryRepository implements StandardRepository
         $objectManager = $this->getManagerRegistry(get_class($aggregate));
 
         $objectManager->persist($aggregate);
+        if ($this->autoFlushOnCommand) {
+            $objectManager->flush();
+        }
     }
 
     private function getManagerRegistry(string $aggregateClass): ObjectManager
