@@ -15,7 +15,6 @@ use Ecotone\Messaging\Channel\PollableChannel\PollableChannelConfiguration;
 use Ecotone\Messaging\Channel\SimpleMessageChannelBuilder;
 use Ecotone\Messaging\Config\ModulePackageList;
 use Ecotone\Messaging\Config\ServiceConfiguration;
-use Ecotone\Messaging\Endpoint\ExecutionPollingMetadata;
 use Ecotone\Modelling\AggregateNotFoundException;
 use Enqueue\Dbal\DbalConnectionFactory;
 use Ramsey\Uuid\Uuid;
@@ -119,7 +118,7 @@ final class CollectorModuleTest extends DbalMessagingTestCase
         $messageId = Uuid::uuid4()->toString();
         $ecotoneLite->sendCommand(new RegisterPerson(100, 'Johny'));
 
-        $ecotoneLite->run('notifications', ExecutionPollingMetadata::createWithTestingSetup());
+        $ecotoneLite->run('notifications');
         $this->assertFalse($ecotoneLite->sendQueryWithRouting('notification.isNotified'));
 
         /** @var DeadLetterGateway $deadLetterGateway */
@@ -129,7 +128,7 @@ final class CollectorModuleTest extends DbalMessagingTestCase
         }
         $this->assertFalse($ecotoneLite->sendQueryWithRouting('notification.isNotified'));
 
-        $ecotoneLite->run('notifications', ExecutionPollingMetadata::createWithTestingSetup());
+        $ecotoneLite->run('notifications');
         $this->assertTrue($ecotoneLite->sendQueryWithRouting('notification.isNotified'));
     }
 
