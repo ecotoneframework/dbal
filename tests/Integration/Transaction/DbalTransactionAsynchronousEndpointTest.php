@@ -20,6 +20,10 @@ use Test\Ecotone\Dbal\Fixture\ORM\Person\Person;
 /**
  * @internal
  */
+/**
+ * licence Apache-2.0
+ * @internal
+ */
 final class DbalTransactionAsynchronousEndpointTest extends DbalMessagingTestCase
 {
     public function setUp(): void

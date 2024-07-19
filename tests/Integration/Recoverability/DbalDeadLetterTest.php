@@ -16,6 +16,10 @@ use Throwable;
 /**
  * @internal
  */
+/**
+ * licence Apache-2.0
+ * @internal
+ */
 class DbalDeadLetterTest extends DbalMessagingTestCase
 {
     public function test_retrieving_error_message_details()

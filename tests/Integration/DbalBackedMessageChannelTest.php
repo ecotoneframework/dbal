@@ -24,6 +24,10 @@ use Test\Ecotone\Dbal\Fixture\Support\Logger\LoggerExample;
 /**
  * @internal
  */
+/**
+ * licence Apache-2.0
+ * @internal
+ */
 class DbalBackedMessageChannelTest extends DbalMessagingTestCase
 {
     public function test_sending_and_receiving_via_channel()

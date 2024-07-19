@@ -18,6 +18,10 @@ use Test\Ecotone\Dbal\Fixture\AsynchronousChannelTransaction\OrderService;
 /**
  * @internal
  */
+/**
+ * licence Apache-2.0
+ * @internal
+ */
 final class ReconnectTest extends DbalMessagingTestCase
 {
     public function test_it_will_automatically_reconnect(): void

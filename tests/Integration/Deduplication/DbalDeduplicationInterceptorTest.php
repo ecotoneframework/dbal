@@ -15,6 +15,10 @@ use Test\Ecotone\Dbal\Fixture\StubMethodInvocation;
 /**
  * @internal
  */
+/**
+ * licence Apache-2.0
+ * @internal
+ */
 class DbalDeduplicationInterceptorTest extends DbalMessagingTestCase
 {
     public function test_not_deduplicating_for_different_endpoints()

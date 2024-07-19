@@ -9,6 +9,9 @@ use Ecotone\Messaging\Config\Container\DefinedObject;
 use Ecotone\Messaging\Config\Container\Definition;
 
 #[Attribute(Attribute::TARGET_PARAMETER | Attribute::TARGET_METHOD | Attribute::TARGET_CLASS | Attribute::IS_REPEATABLE)]
+/**
+ * licence Apache-2.0
+ */
 final class DbalParameter implements DefinedObject
 {
     /**
@@ -60,7 +63,9 @@ final class DbalParameter implements DefinedObject
             [
                 $this->name,
                 $this->type,
+                $this->expression,
                 $this->convertToMediaType,
+                $this->ignored,
             ]
         );
     }

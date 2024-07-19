@@ -16,6 +16,10 @@ use Test\Ecotone\Dbal\DbalMessagingTestCase;
 /**
  * @internal
  */
+/**
+ * licence Apache-2.0
+ * @internal
+ */
 class ChannelAdapterTest extends DbalMessagingTestCase
 {
     public function test_sending_and_receiving_message()
