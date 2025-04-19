@@ -11,6 +11,7 @@ use Exception;
 use Interop\Queue\ConnectionFactory;
 use Interop\Queue\Context;
 use ReflectionClass;
+use ReflectionMethod;
 
 /**
  * licence Apache-2.0
@@ -66,10 +67,13 @@ class DbalReconnectableConnectionFactory implements ReconnectableConnectionFacto
     {
         $connection = $this->getConnection();
 
-        if ($connection) {
-            $connection->close();
-            $connection->connect();
-        }
+        $reflectionMethod = new ReflectionMethod($connection, 'close');
+        $reflectionMethod->setAccessible(true);
+        $reflectionMethod->invoke($connection);
+
+        $reflectionMethod = new ReflectionMethod($connection, 'connect');
+        $reflectionMethod->setAccessible(true);
+        $reflectionMethod->invoke($connection);
     }
 
     public function getConnection(): Connection

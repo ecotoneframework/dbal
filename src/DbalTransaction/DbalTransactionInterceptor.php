@@ -17,7 +17,6 @@ use Enqueue\Dbal\DbalContext;
 use Enqueue\Dbal\ManagerRegistryConnectionFactory;
 use Exception;
 use Interop\Queue\ConnectionFactory;
-use PDOException;
 use Throwable;
 
 /**
@@ -91,11 +90,11 @@ class DbalTransactionInterceptor
                 try {
                     $connection->commit();
                     $logger->info('Database Transaction committed', $message);
-                } catch (PDOException $exception) {
-                    if (str_contains($exception->getMessage(), 'There is no active transaction')) {
-                        /** Handles the case where Mysql did implicit commit, when new creating tables */
+                } catch (Exception $exception) {
+                    // Handle the case where a database did an implicit commit or the transaction is no longer active
+                    if ($this->isImplicitCommitException($exception)) {
                         $logger->info(
-                            'Implicit Commit was detected, skipping manual one.',
+                            sprintf('Implicit Commit was detected, skipping manual one.'),
                             $message,
                             ['exception' => $exception],
                         );
@@ -103,6 +102,7 @@ class DbalTransactionInterceptor
                         try {
                             $connection->rollBack();
                         } catch (Exception) {
+                            // Ignore rollback errors after implicit commit
                         };
 
                         continue;
@@ -131,5 +131,23 @@ class DbalTransactionInterceptor
         }
 
         return $result;
+    }
+
+    private function isImplicitCommitException(Throwable $exception): bool
+    {
+        $patterns = [
+            'No active transaction',
+            'There is no active transaction',
+            'Transaction not active',
+            'not in a transaction',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (str_contains($exception->getMessage(), $pattern)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
