@@ -12,12 +12,12 @@ use Ecotone\Messaging\Config\Annotation\ModuleConfiguration\MessagingGatewayModu
 use Ecotone\Messaging\Config\ModulePackageList;
 use Ecotone\Messaging\Config\ServiceConfiguration;
 use Ecotone\Messaging\Endpoint\ExecutionPollingMetadata;
+use Ecotone\Messaging\Handler\MessageHandlingException;
 use Ecotone\Messaging\Handler\Recoverability\ErrorContext;
 use Ecotone\Modelling\Attribute\InstantRetry;
 use Ecotone\Test\LicenceTesting;
 use Ecotone\Test\StubLogger;
 use Enqueue\Dbal\DbalConnectionFactory;
-use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 use Test\Ecotone\Dbal\Fixture\DeadLetter\SynchronousExample\ErrorConfigurationContext;
@@ -189,7 +189,7 @@ final class DbalErrorChannelCommandBusTest extends DbalMessagingTestCase
         $exception = false;
         try {
             $commandBus->sendWithRouting('order.place', 'coffee');
-        } catch (InvalidArgumentException) {
+        } catch (MessageHandlingException) {
             $exception = true;
         }
 
