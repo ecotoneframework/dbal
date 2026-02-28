@@ -17,8 +17,8 @@ use Ecotone\Messaging\Config\ModulePackageList;
 use Ecotone\Messaging\Config\ServiceConfiguration;
 use Ecotone\Modelling\AggregateNotFoundException;
 use Enqueue\Dbal\DbalConnectionFactory;
-use Ramsey\Uuid\Uuid;
 use RuntimeException;
+use Symfony\Component\Uid\Uuid;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 use Test\Ecotone\Dbal\Fixture\ORM\AsynchronousEventHandler\NotificationService;
 use Test\Ecotone\Dbal\Fixture\ORM\Person\Person;
@@ -119,7 +119,7 @@ final class CollectorModuleTest extends DbalMessagingTestCase
             ]
         );
 
-        $messageId = Uuid::uuid4()->toString();
+        $messageId = Uuid::v7()->toRfc4122();
         $ecotoneLite->sendCommand(new RegisterPerson(100, 'Johny'));
 
         $ecotoneLite->run('notifications');
