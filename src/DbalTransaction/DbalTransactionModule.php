@@ -20,6 +20,7 @@ use Ecotone\Messaging\Handler\Processor\MethodInvoker\AroundInterceptorBuilder;
 use Ecotone\Messaging\Handler\Recoverability\RetryRunner;
 use Ecotone\Messaging\Precedence;
 use Ecotone\Modelling\CommandBus;
+use Ecotone\Modelling\Config\DatabaseTransaction\TransactionStatusTracker;
 use Ecotone\Projecting\Config\ProjectingConsoleCommands;
 use Enqueue\Dbal\DbalConnectionFactory;
 
@@ -59,7 +60,6 @@ class DbalTransactionModule implements AnnotationModule
         if ($dbalConfiguration->isTransactionOnConsoleCommands()) {
             $pointcut .= '||(' . ConsoleCommand::class . ')';
         }
-        $pointcut = '(' . $pointcut . ')&&not(' . WithoutDbalTransaction::class . ')';
         $pointcut .= '&&not('. ProjectingConsoleCommands::class . '::backfillProjection)';
         $connectionFactories = $dbalConfiguration->getDefaultConnectionReferenceNames() ?: [DbalConnectionFactory::class];
 
@@ -68,6 +68,7 @@ class DbalTransactionModule implements AnnotationModule
             $dbalConfiguration->getDisabledTransactionsOnAsynchronousEndpointNames(),
             new Reference(RetryRunner::class),
             new Reference(LoggingGateway::class),
+            new Reference(TransactionStatusTracker::class),
         ]);
 
         $messagingConfiguration
