@@ -17,9 +17,16 @@
     ],
     "keywords": [
         "dbal",
-        "ecotone"
+        "doctrine",
+        "ecotone",
+        "outbox",
+        "dead-letter-queue",
+        "messaging",
+        "saga",
+        "durable-workflows",
+        "document-store"
     ],
-    "description": "Doctrine DBAL integration for Ecotone — database-backed message channel, outbox pattern, dead letter queue, and document store.",
+    "description": "Doctrine DBAL integration for Ecotone — database-backed message channel, outbox pattern, dead letter queue, durable saga state storage, and document store.",
     "autoload": {
         "psr-4": {
             "Ecotone\\Dbal\\": "src",
@@ -34,7 +41,7 @@
         }
     },
     "require": {
-        "ecotone/enqueue": "~1.313.1",
+        "ecotone/enqueue": "~1.313.2",
         "doctrine/dbal": "^3.9|^4.0",
         "enqueue/dsn": "^0.10.4"
     },
@@ -45,7 +52,7 @@
         "doctrine/orm": "^2.11|^3.0",
         "doctrine/cache": "^1.0.0|^2.0",
         "doctrine/annotations": "^1.13|^2.0",
-        "ecotone/jms-converter": "~1.313.1",
+        "ecotone/jms-converter": "~1.313.2",
         "symfony/expression-language": "^6.4|^7.0|^8.0"
     },
     "scripts": {
@@ -58,7 +65,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "1.313.1-dev"
+            "dev-main": "1.313.2-dev"
         },
         "ecotone": {
             "repository": "dbal"
@@ -74,7 +81,7 @@
                 "description": "Allows to use Enterprise features of Ecotone. For more information please write to support@simplycodedsoftware.com"
             }
         },
-        "release-time": "2026-05-18 19:18:46"
+        "release-time": "2026-05-22 17:45:28"
     },
     "conflict": {
         "enqueue/dbal": "*"
