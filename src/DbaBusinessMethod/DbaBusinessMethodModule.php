@@ -13,12 +13,14 @@ use Ecotone\Messaging\Attribute\ModuleAnnotation;
 use Ecotone\Messaging\Config\Annotation\AnnotatedDefinitionReference;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
 use Ecotone\Messaging\Config\Configuration;
+use Ecotone\Messaging\Config\Container\AttributeDeclaration;
 use Ecotone\Messaging\Config\Container\Definition;
 use Ecotone\Messaging\Config\Container\Reference;
 use Ecotone\Messaging\Config\ModulePackageList;
 use Ecotone\Messaging\Config\ModuleReferenceSearchService;
 use Ecotone\Messaging\Config\ServiceConfiguration;
 use Ecotone\Messaging\Conversion\ConversionService;
+use Ecotone\Messaging\Handler\ClosureExpression\AttributeExpressionExecutorCompiler;
 use Ecotone\Messaging\Handler\ExpressionEvaluationService;
 use Ecotone\Messaging\Handler\Gateway\GatewayProxyBuilder;
 use Ecotone\Messaging\Handler\Gateway\ParameterToMessageConverter\GatewayHeaderBuilder;
@@ -196,19 +198,22 @@ final class DbaBusinessMethodModule implements AnnotationModule
             ),
         ];
 
+        $dbalParameterGroups = [
+            [null, $interface->getClassAnnotationOf(Type::object(DbalParameter::class))],
+            [$interface->getMethodName(), $interface->getMethodAnnotationsOf(Type::object(DbalParameter::class))],
+        ];
         /** @var DbalParameter $dbalParameterAttribute */
-        foreach (array_merge(
-            $interface->getClassAnnotationOf(Type::object(DbalParameter::class)),
-            $interface->getMethodAnnotationsOf(Type::object(DbalParameter::class))
-        ) as $dbalParameterAttribute) {
-            Assert::isFalse(isset($parameterConverters[$dbalParameterAttribute->getName()]), "Parameter {$dbalParameterAttribute->getName()} is defined twice in {$dbalParameterAttribute->getName()}");
-            Assert::isTrue($dbalParameterAttribute->getName() !== null, "Parameter name must be defined in {$dbalParameterAttribute->getName()}");
-            Assert::isTrue($dbalParameterAttribute->getExpression() !== null, "Parameter {$dbalParameterAttribute->getName()} must have expression defined in {$dbalParameterAttribute->getName()}");
+        foreach ($dbalParameterGroups as [$methodName, $dbalParameterAttributes]) {
+            foreach ($dbalParameterAttributes as $index => $dbalParameterAttribute) {
+                Assert::isFalse(isset($parameterConverters[$dbalParameterAttribute->getName()]), "Parameter {$dbalParameterAttribute->getName()} is defined twice in {$dbalParameterAttribute->getName()}");
+                Assert::isTrue($dbalParameterAttribute->getName() !== null, "Parameter name must be defined in {$dbalParameterAttribute->getName()}");
+                Assert::isTrue($dbalParameterAttribute->getExpression() !== null, "Parameter {$dbalParameterAttribute->getName()} must have expression defined in {$dbalParameterAttribute->getName()}");
 
-            $parameterConverters[$dbalParameterAttribute->getName()] = GatewayHeaderValueBuilder::create(
-                DbalBusinessMethodHandler::HEADER_PARAMETER_TYPE_PREFIX . $dbalParameterAttribute->getName(),
-                $dbalParameterAttribute
-            );
+                $parameterConverters[$dbalParameterAttribute->getName()] = GatewayHeaderValueBuilder::create(
+                    DbalBusinessMethodHandler::HEADER_PARAMETER_TYPE_PREFIX . $dbalParameterAttribute->getName(),
+                    self::dbalParameterConfig($dbalParameterAttribute, $interface, $methodName, null, $index)
+                );
+            }
         }
 
         foreach ($interface->getInterfaceParameters() as $interfaceParameter) {
@@ -221,7 +226,7 @@ final class DbaBusinessMethodModule implements AnnotationModule
                 Assert::isFalse(isset($parameterConverters[$dbalParameterAttribute->getName()]), "Parameter {$dbalParameterAttribute->getName()} is defined twice");
                 $parameterConverters[] = GatewayHeaderValueBuilder::create(
                     DbalBusinessMethodHandler::HEADER_PARAMETER_TYPE_PREFIX . $interfaceParameter->getName(),
-                    $dbalParameterAttribute
+                    self::dbalParameterConfig($dbalParameterAttribute, $interface, $interface->getMethodName(), $interfaceParameter->getName(), 0)
                 );
             }
 
@@ -232,6 +237,30 @@ final class DbaBusinessMethodModule implements AnnotationModule
         }
 
         return $parameterConverters;
+    }
+
+    private static function dbalParameterConfig(DbalParameter $dbalParameterAttribute, InterfaceToCall $interface, ?string $methodName, ?string $parameterName, int $index): Definition
+    {
+        if ($dbalParameterAttribute->getExpression() === null) {
+            return new Definition(DbalParameterConfig::class, [$dbalParameterAttribute, null], [DbalParameterConfig::class, 'fromAttribute']);
+        }
+
+        $attributeDeclaration = new AttributeDeclaration(
+            DbalParameter::class,
+            $interface->getInterfaceName(),
+            $methodName,
+            $parameterName,
+            $index,
+        );
+
+        return new Definition(
+            DbalParameterConfig::class,
+            [
+                $attributeDeclaration->toAttributeDefinition(),
+                AttributeExpressionExecutorCompiler::compileForContext($dbalParameterAttribute, $attributeDeclaration),
+            ],
+            [DbalParameterConfig::class, 'fromAttribute'],
+        );
     }
 
     public function getModuleExtensions(ServiceConfiguration $serviceConfiguration, array $serviceExtensions): array
