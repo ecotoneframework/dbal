@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Test\Ecotone\Dbal\Fixture\AsyncPublishing;
+namespace Test\Ecotone\Dbal\Fixture\HighThroughputPublishing;
 
 use Ecotone\Messaging\BatchMessage;
-use Ecotone\Messaging\Channel\AsyncPublishing\AsyncPublishingRegistry;
-use Ecotone\Messaging\Channel\AsyncPublishing\PublishingFailedException;
 use Ecotone\Messaging\Channel\BatchSupportingMessageChannel;
+use Ecotone\Messaging\Channel\DeliveryConfirmation\PendingDeliveryRegistry;
+use Ecotone\Messaging\Channel\DeliveryConfirmation\PublishingFailedException;
 use Ecotone\Messaging\Endpoint\PollingMetadata;
 use Ecotone\Messaging\Message;
 use Ecotone\Messaging\PollableChannel;
@@ -16,14 +16,14 @@ use Ecotone\Messaging\Support\MessageBuilder;
 /**
  * licence Apache-2.0
  */
-final class AsyncPublishingTestChannel implements PollableChannel, BatchSupportingMessageChannel
+final class HighThroughputTestChannel implements PollableChannel, BatchSupportingMessageChannel
 {
     /** @var Message[] */
     private array $queue = [];
 
     public function __construct(
         private string $channelName,
-        private AsyncPublishingRegistry $asyncPublishingRegistry,
+        private PendingDeliveryRegistry $pendingDeliveryRegistry,
         private ?string $deliveryFailureReason = null,
     ) {
     }
@@ -44,7 +44,7 @@ final class AsyncPublishingTestChannel implements PollableChannel, BatchSupporti
 
         $pendingDelivery = new TestPendingDelivery($message, $this->channelName, $this->deliveryFailureReason);
 
-        if (! $this->asyncPublishingRegistry->isScopeActive()) {
+        if (! $this->pendingDeliveryRegistry->isScopeActive()) {
             $deliveryResult = $pendingDelivery->awaitDelivery();
             if (! $deliveryResult->isSuccessful()) {
                 throw PublishingFailedException::withFailedDeliveries($deliveryResult->getFailedDeliveries());
@@ -53,7 +53,7 @@ final class AsyncPublishingTestChannel implements PollableChannel, BatchSupporti
             return;
         }
 
-        $this->asyncPublishingRegistry->register($this->channelName, $pendingDelivery);
+        $this->pendingDeliveryRegistry->register($this->channelName, $pendingDelivery);
     }
 
     public function receive(): ?Message

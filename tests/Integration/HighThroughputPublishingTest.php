@@ -11,7 +11,7 @@ use Ecotone\Lite\Test\FlowTestSupport;
 use Ecotone\Messaging\Attribute\Asynchronous;
 use Ecotone\Messaging\Attribute\Parameter\Reference;
 use Ecotone\Messaging\BatchMessage;
-use Ecotone\Messaging\Channel\AsyncPublishing\PublishingFailedException;
+use Ecotone\Messaging\Channel\DeliveryConfirmation\PublishingFailedException;
 use Ecotone\Messaging\Config\ConfigurationException;
 use Ecotone\Messaging\Config\ModulePackageList;
 use Ecotone\Messaging\Config\ServiceConfiguration;
@@ -32,15 +32,15 @@ use Enqueue\Dbal\DbalConnectionFactory;
 use Interop\Queue\Exception\Exception;
 use Symfony\Component\Uid\Uuid;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
-use Test\Ecotone\Dbal\Fixture\AsyncPublishing\OrderWasPlaced;
+use Test\Ecotone\Dbal\Fixture\HighThroughputPublishing\OrderWasPlaced;
 
 /**
  * licence Apache-2.0
  * @internal
  */
-final class AsyncPublishingTest extends DbalMessagingTestCase
+final class HighThroughputPublishingTest extends DbalMessagingTestCase
 {
-    public function test_multiple_messages_published_asynchronously_from_command_handler_are_delivered(): void
+    public function test_multiple_messages_published_from_command_handler_are_delivered(): void
     {
         $orderService = $this->createOrderService();
         $messaging = $this->bootstrapEcotoneWithChannel($orderService, LicenceTesting::VALID_LICENCE);
@@ -57,7 +57,7 @@ final class AsyncPublishingTest extends DbalMessagingTestCase
         );
     }
 
-    public function test_async_publishing_requires_enterprise_licence(): void
+    public function test_high_throughput_publishing_requires_enterprise_licence(): void
     {
         $orderService = $this->createOrderService();
 
@@ -66,7 +66,7 @@ final class AsyncPublishingTest extends DbalMessagingTestCase
         $this->bootstrapEcotoneWithChannel($orderService, licenceKey: null);
     }
 
-    public function test_async_publishing_via_message_publisher_requires_enterprise_licence(): void
+    public function test_high_throughput_publishing_via_message_publisher_requires_enterprise_licence(): void
     {
         $this->expectException(LicensingException::class);
 
@@ -77,43 +77,35 @@ final class AsyncPublishingTest extends DbalMessagingTestCase
                 ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
                 ->withExtensionObjects([
                     DbalMessagePublisherConfiguration::create(MessagePublisher::class, Uuid::v7()->toRfc4122())
-                        ->withAsyncPublishing(),
+                        ->withHighThroughputPublishing(),
                 ]),
         );
     }
 
-    public function test_async_publish_on_publisher_without_async_configuration_throws_before_publishing(): void
+    public function test_publish_deferred_is_not_available_as_confirmation_can_not_be_deferred(): void
     {
         $queueName = Uuid::v7()->toRfc4122();
-        $messaging = $this->bootstrapPublisher($queueName, asyncPublishing: false);
+        $messaging = $this->bootstrapPublisher($queueName, highThroughputPublishing: true);
         $publisher = $messaging->getGateway(MessagePublisher::class);
 
-        $publishFailed = false;
-        try {
-            $publisher->asyncPublish('order that must not be published');
-        } catch (PublishingFailedException) {
-            $publishFailed = true;
-        }
+        $this->expectException(PublishingFailedException::class);
+        $this->expectExceptionMessageMatches('/not configured for non blocking confirmation/');
 
-        $this->assertTrue($publishFailed);
-        $this->assertNull($messaging->getMessageChannel($queueName)->receive());
+        $publisher->publishDeferred('order that must not be published');
     }
 
-    public function test_message_publisher_async_publish_confirms_delivery_on_future_resolve(): void
+    public function test_message_publisher_delivers_single_and_batched_messages(): void
     {
         $queueName = Uuid::v7()->toRfc4122();
-        $messaging = $this->bootstrapPublisher($queueName, asyncPublishing: true);
+        $messaging = $this->bootstrapPublisher($queueName, highThroughputPublishing: true);
         $publisher = $messaging->getGateway(MessagePublisher::class);
 
-        $singleFuture = $publisher->asyncPublish('single order');
-        $batchFuture = $publisher->asyncPublish(
+        $publisher->send('single order');
+        $publisher->convertAndSend(
             BatchMessage::constructEmpty()
                 ->append('first order')
                 ->append('second order', ['priority' => '5'])
         );
-
-        $this->assertNull($singleFuture->resolve());
-        $this->assertNull($batchFuture->resolve());
 
         $receivedPayloads = [];
         while ($message = $messaging->getMessageChannel($queueName)->receive()) {
@@ -123,10 +115,10 @@ final class AsyncPublishingTest extends DbalMessagingTestCase
         $this->assertSame(['first order', 'second order', 'single order'], $receivedPayloads);
     }
 
-    public function test_sending_batch_message_over_channel_without_async_publishing_throws(): void
+    public function test_sending_batch_message_over_channel_without_batch_publishing_throws(): void
     {
         $queueName = Uuid::v7()->toRfc4122();
-        $messaging = $this->bootstrapPublisher($queueName, asyncPublishing: false);
+        $messaging = $this->bootstrapPublisher($queueName, highThroughputPublishing: false);
 
         $this->expectException(ConfigurationException::class);
 
@@ -135,10 +127,10 @@ final class AsyncPublishingTest extends DbalMessagingTestCase
         );
     }
 
-    public function test_sending_batch_message_via_publisher_without_async_publishing_throws(): void
+    public function test_sending_batch_message_via_publisher_without_batch_publishing_throws(): void
     {
         $queueName = Uuid::v7()->toRfc4122();
-        $messaging = $this->bootstrapPublisher($queueName, asyncPublishing: false);
+        $messaging = $this->bootstrapPublisher($queueName, highThroughputPublishing: false);
         $publisher = $messaging->getGateway(MessagePublisher::class);
 
         $this->expectException(ConfigurationException::class);
@@ -167,7 +159,7 @@ final class AsyncPublishingTest extends DbalMessagingTestCase
                 ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::ASYNCHRONOUS_PACKAGE, ModulePackageList::DBAL_PACKAGE]))
                 ->withExtensionObjects([
                     DbalMessagePublisherConfiguration::create(MessagePublisher::class, $queueName)
-                        ->withAsyncPublishing(),
+                        ->withHighThroughputPublishing(),
                     DbalBackedMessageChannelBuilder::create($queueName),
                 ]),
             licenceKey: LicenceTesting::VALID_LICENCE,
@@ -186,14 +178,14 @@ final class AsyncPublishingTest extends DbalMessagingTestCase
     public function test_delayed_entry_of_published_batch_is_delivered_after_delay(): void
     {
         $queueName = Uuid::v7()->toRfc4122();
-        $messaging = $this->bootstrapPublisher($queueName, asyncPublishing: true);
+        $messaging = $this->bootstrapPublisher($queueName, highThroughputPublishing: true);
         $publisher = $messaging->getGateway(MessagePublisher::class);
 
-        $publisher->asyncPublish(
+        $publisher->convertAndSend(
             BatchMessage::constructEmpty()
                 ->append('immediate order')
                 ->append('delayed order', [MessageHeaders::DELIVERY_DELAY => 3000])
-        )->resolve();
+        );
 
         $channel = $messaging->getMessageChannel($queueName);
         $this->assertSame('immediate order', $channel->receive()->getPayload());
@@ -205,14 +197,14 @@ final class AsyncPublishingTest extends DbalMessagingTestCase
     public function test_expired_entry_of_published_batch_is_not_delivered(): void
     {
         $queueName = Uuid::v7()->toRfc4122();
-        $messaging = $this->bootstrapPublisher($queueName, asyncPublishing: true);
+        $messaging = $this->bootstrapPublisher($queueName, highThroughputPublishing: true);
         $publisher = $messaging->getGateway(MessagePublisher::class);
 
-        $publisher->asyncPublish(
+        $publisher->convertAndSend(
             BatchMessage::constructEmpty()
                 ->append('expiring order', [MessageHeaders::TIME_TO_LIVE => 1000])
                 ->append('kept order')
-        )->resolve();
+        );
 
         sleep(2);
 
@@ -224,15 +216,15 @@ final class AsyncPublishingTest extends DbalMessagingTestCase
     public function test_publishing_after_queue_table_is_dropped_throws(): void
     {
         $queueName = Uuid::v7()->toRfc4122();
-        $messaging = $this->bootstrapPublisher($queueName, asyncPublishing: true);
+        $messaging = $this->bootstrapPublisher($queueName, highThroughputPublishing: true);
         $publisher = $messaging->getGateway(MessagePublisher::class);
-        $publisher->asyncPublish('first order')->resolve();
+        $publisher->send('first order');
 
         $this->getConnection()->executeStatement('DROP TABLE enqueue');
 
         $this->expectException(Exception::class);
 
-        $publisher->asyncPublish('order published into missing table');
+        $publisher->send('order published into missing table');
     }
 
     private function receiveWithDeadline(PollableChannel $channel, int $deadlineInSeconds): ?Message
@@ -292,11 +284,11 @@ final class AsyncPublishingTest extends DbalMessagingTestCase
         );
     }
 
-    private function bootstrapPublisher(string $queueName, bool $asyncPublishing): FlowTestSupport
+    private function bootstrapPublisher(string $queueName, bool $highThroughputPublishing): FlowTestSupport
     {
         $publisherConfiguration = DbalMessagePublisherConfiguration::create(MessagePublisher::class, $queueName);
-        if ($asyncPublishing) {
-            $publisherConfiguration = $publisherConfiguration->withAsyncPublishing();
+        if ($highThroughputPublishing) {
+            $publisherConfiguration = $publisherConfiguration->withHighThroughputPublishing();
         }
 
         return EcotoneLite::bootstrapFlowTesting(

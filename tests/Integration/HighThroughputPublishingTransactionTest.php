@@ -7,7 +7,7 @@ namespace Test\Ecotone\Dbal\Integration;
 use Ecotone\Dbal\Configuration\DbalConfiguration;
 use Ecotone\Lite\EcotoneLite;
 use Ecotone\Lite\Test\FlowTestSupport;
-use Ecotone\Messaging\Channel\AsyncPublishing\PublishingFailedException;
+use Ecotone\Messaging\Channel\DeliveryConfirmation\PublishingFailedException;
 use Ecotone\Messaging\Channel\PollableChannel\GlobalPollableChannelConfiguration;
 use Ecotone\Messaging\Channel\SimpleMessageChannelBuilder;
 use Ecotone\Messaging\Config\ModulePackageList;
@@ -16,7 +16,7 @@ use Ecotone\Messaging\Handler\Recoverability\ErrorContext;
 use Ecotone\Modelling\AggregateNotFoundException;
 use Enqueue\Dbal\DbalConnectionFactory;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
-use Test\Ecotone\Dbal\Fixture\AsyncPublishing\AsyncPublishingTestChannelBuilder;
+use Test\Ecotone\Dbal\Fixture\HighThroughputPublishing\HighThroughputTestChannelBuilder;
 use Test\Ecotone\Dbal\Fixture\ORM\AsynchronousEventHandler\NotificationService;
 use Test\Ecotone\Dbal\Fixture\ORM\Person\Person;
 use Test\Ecotone\Dbal\Fixture\ORM\Person\RegisterPerson;
@@ -25,12 +25,12 @@ use Test\Ecotone\Dbal\Fixture\ORM\Person\RegisterPerson;
  * licence Apache-2.0
  * @internal
  */
-final class AsyncPublishingTransactionTest extends DbalMessagingTestCase
+final class HighThroughputPublishingTransactionTest extends DbalMessagingTestCase
 {
     public function test_successful_delivery_confirmations_commit_database_transaction(): void
     {
         $ecotoneLite = $this->bootstrapEcotone(
-            [AsyncPublishingTestChannelBuilder::create('notifications')],
+            [HighThroughputTestChannelBuilder::create('notifications')],
             []
         );
 
@@ -43,7 +43,7 @@ final class AsyncPublishingTransactionTest extends DbalMessagingTestCase
     public function test_failed_delivery_confirmation_rolls_back_database_transaction(): void
     {
         $ecotoneLite = $this->bootstrapEcotone(
-            [AsyncPublishingTestChannelBuilder::create('notifications', deliveryFailureReason: 'broker not available')],
+            [HighThroughputTestChannelBuilder::create('notifications', deliveryFailureReason: 'broker not available')],
             []
         );
 
@@ -64,7 +64,7 @@ final class AsyncPublishingTransactionTest extends DbalMessagingTestCase
     {
         $ecotoneLite = $this->bootstrapEcotone(
             [
-                AsyncPublishingTestChannelBuilder::create('notifications', deliveryFailureReason: 'broker not available'),
+                HighThroughputTestChannelBuilder::create('notifications', deliveryFailureReason: 'broker not available'),
                 SimpleMessageChannelBuilder::createQueueChannel('failure_channel'),
             ],
             [GlobalPollableChannelConfiguration::createWithDefaults()->withErrorChannel('failure_channel')]

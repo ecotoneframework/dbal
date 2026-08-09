@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Test\Ecotone\Dbal\Fixture\AsyncPublishing;
+namespace Test\Ecotone\Dbal\Fixture\HighThroughputPublishing;
 
-use Ecotone\Messaging\Channel\AsyncPublishing\AsyncPublishingRegistry;
+use Ecotone\Messaging\Channel\DeliveryConfirmation\PendingDeliveryRegistry;
 use Ecotone\Messaging\Channel\MessageChannelBuilder;
 use Ecotone\Messaging\Config\Container\Definition;
 use Ecotone\Messaging\Config\Container\MessagingContainerBuilder;
@@ -13,7 +13,7 @@ use Ecotone\Messaging\Config\Container\Reference;
 /**
  * licence Apache-2.0
  */
-final class AsyncPublishingTestChannelBuilder implements MessageChannelBuilder
+final class HighThroughputTestChannelBuilder implements MessageChannelBuilder
 {
     private function __construct(private string $channelName, private ?string $deliveryFailureReason)
     {
@@ -41,9 +41,9 @@ final class AsyncPublishingTestChannelBuilder implements MessageChannelBuilder
 
     public function compile(MessagingContainerBuilder $builder): Definition|Reference
     {
-        return new Definition(AsyncPublishingTestChannel::class, [
+        return new Definition(HighThroughputTestChannel::class, [
             $this->channelName,
-            new Reference(AsyncPublishingRegistry::class),
+            new Reference(PendingDeliveryRegistry::class),
             $this->deliveryFailureReason,
         ]);
     }
