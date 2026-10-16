@@ -6,7 +6,6 @@ namespace Test\Ecotone\Dbal\Integration;
 
 use Ecotone\Api\Dbal\ExtensionObject\DbalConfiguration;
 use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\ExtensionObject\ServiceConfiguration;
 use Ecotone\Api\ExtensionObject\SimpleMessageChannelBuilder;
 use Ecotone\Api\Lite\Test\FlowTestSupport;
 use Ecotone\Api\Messaging\ErrorContext;
@@ -14,6 +13,7 @@ use Ecotone\Api\Modelling\AggregateNotFoundException;
 use Ecotone\Dbal\Connection\DbalConnectionFactory;
 use Ecotone\Messaging\Channel\DeliveryConfirmation\PublishingFailedException;
 use Ecotone\Messaging\Channel\PollableChannel\GlobalPollableChannelConfiguration;
+use Ecotone\Test\ChannelTestSupport;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 use Test\Ecotone\Dbal\Fixture\HighThroughputPublishing\HighThroughputTestChannelBuilder;
 use Test\Ecotone\Dbal\Fixture\ORM\AsynchronousEventHandler\NotificationService;
@@ -36,7 +36,7 @@ final class HighThroughputPublishingTransactionTest extends DbalMessagingTestCas
         $ecotoneLite->sendCommand(new RegisterPerson(100, 'Johny'));
 
         $this->assertNotNull($ecotoneLite->sendQueryWithRouting('person.getName', metadata: ['aggregate.id' => 100]));
-        $this->assertNotNull($ecotoneLite->getMessageChannel('notifications')->receive());
+        $this->assertNotNull(ChannelTestSupport::of($ecotoneLite)->getMessageChannel('notifications')->receive());
     }
 
     public function test_failed_delivery_confirmation_rolls_back_database_transaction(): void
@@ -73,7 +73,7 @@ final class HighThroughputPublishingTransactionTest extends DbalMessagingTestCas
 
         $this->assertNotNull($ecotoneLite->sendQueryWithRouting('person.getName', metadata: ['aggregate.id' => 100]));
 
-        $failedMessage = $ecotoneLite->receiveMessageFrom('failure_channel');
+        $failedMessage = ChannelTestSupport::of($ecotoneLite)->receiveMessageFrom('failure_channel');
         $this->assertNotNull($failedMessage);
         $this->assertStringContainsString('broker not available', $failedMessage->getHeaders()->get(ErrorContext::EXCEPTION_MESSAGE));
     }
@@ -85,19 +85,9 @@ final class HighThroughputPublishingTransactionTest extends DbalMessagingTestCas
         return $this->bootstrapFlowTesting(
             [Person::class, NotificationService::class],
             [new NotificationService(), DbalConnectionFactory::class => $this->getORMConnectionFactory([__DIR__ . '/../Fixture/ORM/Person'])],
-            ServiceConfiguration::createWithDefaults()
-                ->withEnabledModulePackageNames([ModulePackageList::DBAL_PACKAGE, ])
-                ->withExtensionObjects(array_merge(
-                    $extensionObjects,
-                    $channelBuilders,
-                    [
-                        DbalConfiguration::createWithDefaults()
-                            ->withTransactionOnCommandBus(true)
-                            ->withTransactionOnAsynchronousEndpoints(true)
-                            ->withDoctrineORMRepositories(true),
-                    ]
-                )),
-            addInMemoryStateStoredRepository: false
+            extensionObjects: array_merge($extensionObjects, $channelBuilders, [DbalConfiguration::createWithDefaults()->withTransactionOnCommandBus(true)->withTransactionOnAsynchronousEndpoints(true)->withDoctrineORMRepositories(true), ]),
+            enabledModules: [ModulePackageList::DBAL_PACKAGE, ],
+            addInMemoryStateStoredRepository: false,
         );
     }
 }

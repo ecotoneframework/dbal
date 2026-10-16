@@ -13,6 +13,7 @@ use Ecotone\Messaging\Config\Container\MessagingContainerBuilder;
 use Ecotone\Messaging\Config\Container\Reference;
 use Ecotone\Messaging\Conversion\ConversionService;
 use Ecotone\Messaging\Support\LicensingException;
+use Ecotone\Messaging\Support\MessageBuilder;
 
 /**
  * licence Apache-2.0
@@ -56,7 +57,7 @@ class DbalOutboundChannelAdapterBuilder extends EnqueueOutboundChannelAdapterBui
 
     public function compile(MessagingContainerBuilder $builder): Definition
     {
-        if ($this->batchPublishing && ! $builder->getServiceConfiguration()->isRunningForEnterprise()) {
+        if ($this->batchPublishing && ! $builder->getBootstrapConfiguration()->isRunningForEnterprise()) {
             throw LicensingException::create('High Throughput Publishing is available only with Ecotone Enterprise licence. See https://docs.ecotone.tech/enterprise for details.');
         }
 
@@ -69,6 +70,7 @@ class DbalOutboundChannelAdapterBuilder extends EnqueueOutboundChannelAdapterBui
 
         $outboundMessageConverter = new Definition(OutboundMessageConverter::class, [
             $this->headerMapper,
+            new Reference(MessageBuilder::class),
             $this->defaultConversionMediaType,
             $this->defaultDeliveryDelay,
             $this->defaultTimeToLive,
@@ -82,6 +84,7 @@ class DbalOutboundChannelAdapterBuilder extends EnqueueOutboundChannelAdapterBui
             $this->autoDeclare,
             $outboundMessageConverter,
             new Reference(ConversionService::REFERENCE_NAME),
+            new Reference(MessageBuilder::class),
             new Reference(EnqueueTableManager::class),
             $this->batchPublishing,
         ]);

@@ -16,14 +16,13 @@ use Ecotone\Api\Dbal\ExtensionObject\MultiTenantConfiguration;
 use Ecotone\Api\ExtensionObject\ExecutionPollingMetadata;
 use Ecotone\Api\ExtensionObject\ModulePackageList;
 use Ecotone\Api\ExtensionObject\PollingMetadata;
-use Ecotone\Api\ExtensionObject\ServiceConfiguration;
 use Ecotone\Api\ExtensionObject\SimpleMessageChannelBuilder;
 use Ecotone\Api\Lite\Test\FlowTestSupport;
 use Ecotone\Api\Messaging\Message;
 use Ecotone\Dbal\Connection\DbalConnectionFactory;
 use Ecotone\Enqueue\ConnectionFactory;
-use Ecotone\Messaging\Support\MessageBuilder;
 use Ecotone\Test\LicenceTesting;
+use Ecotone\Test\StaticMessageBuilder;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 
 /**
@@ -127,7 +126,7 @@ final class ScheduledTenantResolverDatabaseRoutingTest extends DbalMessagingTest
                     return null;
                 }
                 $event = array_shift($this->pending);
-                return MessageBuilder::withPayload($event['personId'])
+                return StaticMessageBuilder::withPayload($event['personId'])
                     ->setHeader('person_name', $event['name'])
                     ->setHeader('source', $event['source'])
                     ->build();
@@ -172,15 +171,9 @@ final class ScheduledTenantResolverDatabaseRoutingTest extends DbalMessagingTest
                     'tenant_b_connection' => $this->connectionForTenantB(),
                 ],
             ),
-            (ServiceConfiguration::createWithDefaults()
-                ->withLicenceKey(LicenceTesting::VALID_LICENCE)
-                ->withEnabledModulePackageNames([ModulePackageList::DBAL_PACKAGE, ])
-                ->withExtensionObjects(
-                    $asynchronous
-                        ? [...$extensionObjects, SimpleMessageChannelBuilder::createQueueChannel('persons_processing')]
-                        : $extensionObjects
-                )),
-            licenceKey: LicenceTesting::VALID_LICENCE
+            extensionObjects: $asynchronous ? [...$extensionObjects, SimpleMessageChannelBuilder::createQueueChannel('persons_processing')] : $extensionObjects,
+            enabledModules: [ModulePackageList::DBAL_PACKAGE, ],
+            licenceKey: LicenceTesting::VALID_LICENCE,
         );
     }
 

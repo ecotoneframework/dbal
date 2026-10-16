@@ -9,14 +9,13 @@ use Ecotone\Api\Dbal\Attribute\WithTenantResolver;
 use Ecotone\Api\Dbal\ExtensionObject\DbalConfiguration;
 use Ecotone\Api\Dbal\ExtensionObject\MultiTenantConfiguration;
 use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\ExtensionObject\ServiceConfiguration;
 use Ecotone\Api\ExtensionObject\SimpleMessageChannelBuilder;
 use Ecotone\Api\Lite\EcotoneLite;
 use Ecotone\Api\Messaging\Message;
 use Ecotone\Dbal\Connection\DbalConnectionFactory;
 use Ecotone\Messaging\Support\LicensingException;
-use Ecotone\Messaging\Support\MessageBuilder;
 use Ecotone\Test\LicenceTesting;
+use Ecotone\Test\StaticMessageBuilder;
 use PHPUnit\Framework\TestCase;
 use Test\Ecotone\Dbal\Fixture\MultiTenant\FakeConnectionFactory;
 
@@ -55,7 +54,7 @@ final class WithTenantResolverLicensingTest extends TestCase
             #[WithTenantResolver(expression: "headers['source']")]
             public function poll(): ?Message
             {
-                return MessageBuilder::withPayload('payload')->setHeader('source', 'tenant_a')->build();
+                return StaticMessageBuilder::withPayload('payload')->setHeader('source', 'tenant_a')->build();
             }
         };
     }
@@ -65,22 +64,13 @@ final class WithTenantResolverLicensingTest extends TestCase
         EcotoneLite::bootstrapFlowTesting(
             [$service::class],
             [$service, 'tenant_a_connection' => new FakeConnectionFactory()],
-            (ServiceConfiguration::createWithDefaults()
-                ->withEnabledModulePackageNames([ModulePackageList::DBAL_PACKAGE, ])
-                ->withExtensionObjects([
-                    MultiTenantConfiguration::createWithDefaultConnection(
-                        'tenant',
-                        ['tenant_a' => 'tenant_a_connection'],
-                        'tenant_a_connection',
-                        DbalConnectionFactory::class,
-                    ),
-                    DbalConfiguration::createWithDefaults()
-                        ->withTransactionOnCommandBus(false)
-                        ->withTransactionOnAsynchronousEndpoints(false)
-                        ->withClearAndFlushObjectManagerOnCommandBus(false)
-                        ->withDeduplication(false),
-                ]))->addExtensionObject(SimpleMessageChannelBuilder::createQueueChannel('external_processing')),
-            licenceKey: $licenceKey
+            extensionObjects: [
+                MultiTenantConfiguration::createWithDefaultConnection('tenant', ['tenant_a' => 'tenant_a_connection'], 'tenant_a_connection', DbalConnectionFactory::class, ),
+                DbalConfiguration::createWithDefaults()->withTransactionOnCommandBus(false)->withTransactionOnAsynchronousEndpoints(false)->withClearAndFlushObjectManagerOnCommandBus(false)->withDeduplication(false),
+                SimpleMessageChannelBuilder::createQueueChannel('external_processing'),
+            ],
+            enabledModules: [ModulePackageList::DBAL_PACKAGE, ],
+            licenceKey: $licenceKey,
         );
     }
 }

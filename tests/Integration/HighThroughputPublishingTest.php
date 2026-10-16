@@ -14,7 +14,6 @@ use Ecotone\Api\Dbal\ExtensionObject\DbalMessagePublisherConfiguration;
 use Ecotone\Api\ExtensionObject\ExecutionPollingMetadata;
 use Ecotone\Api\ExtensionObject\ModulePackageList;
 use Ecotone\Api\ExtensionObject\PollingMetadata;
-use Ecotone\Api\ExtensionObject\ServiceConfiguration;
 use Ecotone\Api\Gateway\EventBus;
 use Ecotone\Api\Gateway\MessagePublisher;
 use Ecotone\Api\Lite\Test\FlowTestSupport;
@@ -28,8 +27,9 @@ use Ecotone\Dbal\Database\MissingTableInstructions;
 use Ecotone\Messaging\Channel\DeliveryConfirmation\PublishingFailedException;
 use Ecotone\Messaging\Config\ConfigurationException;
 use Ecotone\Messaging\Support\LicensingException;
-use Ecotone\Messaging\Support\MessageBuilder;
+use Ecotone\Test\ChannelTestSupport;
 use Ecotone\Test\LicenceTesting;
+use Ecotone\Test\StaticMessageBuilder;
 use Symfony\Component\Uid\Uuid;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 use Test\Ecotone\Dbal\Fixture\HighThroughputPublishing\OrderWasPlaced;
@@ -73,12 +73,8 @@ final class HighThroughputPublishingTest extends DbalMessagingTestCase
         $this->bootstrapFlowTesting(
             [],
             [DbalConnectionFactory::class => $this->getConnectionFactory()],
-            ServiceConfiguration::createWithDefaults()
-                ->withEnabledModulePackageNames([ModulePackageList::DBAL_PACKAGE])
-                ->withExtensionObjects([
-                    DbalMessagePublisherConfiguration::create(MessagePublisher::class, Uuid::v7()->toRfc4122())
-                        ->withHighThroughputPublishing(),
-                ]),
+            extensionObjects: [DbalMessagePublisherConfiguration::create(MessagePublisher::class, Uuid::v7()->toRfc4122())->withHighThroughputPublishing()],
+            enabledModules: [ModulePackageList::DBAL_PACKAGE],
         );
     }
 
@@ -108,7 +104,7 @@ final class HighThroughputPublishingTest extends DbalMessagingTestCase
         );
 
         $receivedPayloads = [];
-        while ($message = $this->receiveImmediatelyFrom($messaging->getMessageChannel($queueName))) {
+        while ($message = $this->receiveImmediatelyFrom(ChannelTestSupport::of($messaging)->getMessageChannel($queueName))) {
             $receivedPayloads[] = $message->getPayload();
         }
         sort($receivedPayloads);
@@ -122,8 +118,8 @@ final class HighThroughputPublishingTest extends DbalMessagingTestCase
 
         $this->expectException(ConfigurationException::class);
 
-        $messaging->getMessageChannel($queueName)->send(
-            MessageBuilder::withPayload(BatchMessage::constructEmpty()->append('first order'))->build()
+        ChannelTestSupport::of($messaging)->getMessageChannel($queueName)->send(
+            StaticMessageBuilder::withPayload(BatchMessage::constructEmpty()->append('first order'))->build()
         );
     }
 
@@ -155,20 +151,18 @@ final class HighThroughputPublishingTest extends DbalMessagingTestCase
         $messaging = $this->bootstrapFlowTesting(
             [$commandHandler::class],
             [DbalConnectionFactory::class => $this->getConnectionFactory(), $commandHandler],
-            ServiceConfiguration::createWithDefaults()
-                ->withEnabledModulePackageNames([ModulePackageList::DBAL_PACKAGE])
-                ->withExtensionObjects([
-                    DbalMessagePublisherConfiguration::create(MessagePublisher::class, $queueName)
-                        ->withHighThroughputPublishing(),
-                    DbalBackedMessageChannelBuilder::create($queueName),
-                ]),
+            extensionObjects: [
+                DbalMessagePublisherConfiguration::create(MessagePublisher::class, $queueName)->withHighThroughputPublishing(),
+                DbalBackedMessageChannelBuilder::create($queueName),
+            ],
+            enabledModules: [ModulePackageList::DBAL_PACKAGE],
             licenceKey: LicenceTesting::VALID_LICENCE,
         );
 
         $messaging->sendCommandWithRouting('order.placeBatch', 'espresso');
 
         $receivedPayloads = [];
-        while ($message = $this->receiveImmediatelyFrom($messaging->getMessageChannel($queueName))) {
+        while ($message = $this->receiveImmediatelyFrom(ChannelTestSupport::of($messaging)->getMessageChannel($queueName))) {
             $receivedPayloads[] = $message->getPayload();
         }
         sort($receivedPayloads);
@@ -187,7 +181,7 @@ final class HighThroughputPublishingTest extends DbalMessagingTestCase
                 ->append('delayed order', [MessageHeaders::DELIVERY_DELAY => 3000])
         );
 
-        $channel = $messaging->getMessageChannel($queueName);
+        $channel = ChannelTestSupport::of($messaging)->getMessageChannel($queueName);
         $this->assertSame('immediate order', $channel->receive()->getPayload());
         $this->assertNull($channel->receiveWithTimeout(PollingMetadata::create('assertNotYetDelivered')->withExecutionTimeLimitInMilliseconds(500)));
 
@@ -208,7 +202,7 @@ final class HighThroughputPublishingTest extends DbalMessagingTestCase
 
         sleep(2);
 
-        $channel = $messaging->getMessageChannel($queueName);
+        $channel = ChannelTestSupport::of($messaging)->getMessageChannel($queueName);
         $this->assertSame('kept order', $channel->receive()->getPayload());
         $this->assertNull($this->receiveImmediatelyFrom($channel));
     }
@@ -275,12 +269,8 @@ final class HighThroughputPublishingTest extends DbalMessagingTestCase
         return $this->bootstrapFlowTesting(
             [$orderService::class],
             [DbalConnectionFactory::class => $this->getConnectionFactory(), $orderService],
-            ServiceConfiguration::createWithDefaults()
-                ->withEnabledModulePackageNames([ModulePackageList::DBAL_PACKAGE])
-                ->withExtensionObjects([
-                    DbalBackedMessageChannelBuilder::create('asyncOrdersChannel')
-                        ->withHighThroughputPublishing(),
-                ]),
+            extensionObjects: [DbalBackedMessageChannelBuilder::create('asyncOrdersChannel')->withHighThroughputPublishing()],
+            enabledModules: [ModulePackageList::DBAL_PACKAGE],
             licenceKey: $licenceKey,
         );
     }
@@ -295,12 +285,11 @@ final class HighThroughputPublishingTest extends DbalMessagingTestCase
         return $this->bootstrapFlowTesting(
             [],
             [DbalConnectionFactory::class => $this->getConnectionFactory()],
-            ServiceConfiguration::createWithDefaults()
-                ->withEnabledModulePackageNames([ModulePackageList::DBAL_PACKAGE])
-                ->withExtensionObjects([
-                    $publisherConfiguration,
-                    DbalBackedMessageChannelBuilder::create($queueName),
-                ]),
+            extensionObjects: [
+                $publisherConfiguration,
+                DbalBackedMessageChannelBuilder::create($queueName),
+            ],
+            enabledModules: [ModulePackageList::DBAL_PACKAGE],
             licenceKey: LicenceTesting::VALID_LICENCE,
         );
     }
