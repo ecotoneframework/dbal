@@ -8,9 +8,11 @@ use Ecotone\Api\Messaging\ErrorContext;
 use Ecotone\Api\Messaging\Message;
 use Ecotone\Api\Messaging\MessageChannel;
 use Ecotone\Api\Messaging\MessageHeaders;
+use Ecotone\Api\Messaging\PollableChannel;
 use Ecotone\Dbal\Tracing\FlowTrackingScope;
 use Ecotone\Messaging\Config\Annotation\ModuleConfiguration\ErrorChannelExceptionMessages;
 use Ecotone\Messaging\Gateway\MessagingEntrypointService;
+use Ecotone\Messaging\Handler\ChannelResolver;
 use Ecotone\Messaging\Support\InvalidArgumentException;
 use Ecotone\Messaging\Support\MessageBuilder;
 
@@ -23,6 +25,7 @@ final class DeadLetterHandler
         private DeadLetterStore $deadLetterStore,
         private MessageBuilder $messageBuilder,
         private FlowTrackingScope $flowTracking,
+        private ChannelResolver $channelResolver,
     ) {
     }
 
@@ -60,18 +63,22 @@ final class DeadLetterHandler
         return $this->deadLetterStore->count();
     }
 
-    public function replay(string|array $messageId, MessagingEntrypointService $messagingEntrypoint): void
+    public function replay(string|array $messageId, MessagingEntrypointService $messagingEntrypoint, ?string $targetChannel = null): void
     {
+        $this->assertTargetChannelExists($targetChannel);
+
         foreach ((array) $messageId as $id) {
-            $this->replayMessage($id, $messagingEntrypoint);
+            $this->replayMessage($id, $messagingEntrypoint, $targetChannel);
         }
     }
 
-    public function replayAll(MessagingEntrypointService $messagingEntrypoint): void
+    public function replayAll(MessagingEntrypointService $messagingEntrypoint, ?string $targetChannel = null): void
     {
+        $this->assertTargetChannelExists($targetChannel);
+
         while ($errorContexts = $this->deadLetterStore->list(100, 0)) {
             foreach ($errorContexts as $errorContext) {
-                $this->replayMessage($errorContext->getMessageId(), $messagingEntrypoint);
+                $this->replayMessage($errorContext->getMessageId(), $messagingEntrypoint, $targetChannel);
             }
         }
     }
@@ -93,18 +100,33 @@ final class DeadLetterHandler
         $this->deadLetterStore->store($message);
     }
 
-    private function replayMessage(string $messageId, MessagingEntrypointService $messagingEntrypoint): void
+    public function assertTargetChannelExists(?string $targetChannel): void
+    {
+        if ($targetChannel === null) {
+            return;
+        }
+        if (! $this->channelResolver->hasChannelWithName($targetChannel)) {
+            throw InvalidArgumentException::create(ErrorChannelExceptionMessages::cannotReplayToUnknownChannel($targetChannel));
+        }
+        if (! $this->channelResolver->resolve($targetChannel) instanceof PollableChannel) {
+            throw InvalidArgumentException::create(ErrorChannelExceptionMessages::cannotReplayToNonAsynchronousChannel($targetChannel));
+        }
+    }
+
+    private function replayMessage(string $messageId, MessagingEntrypointService $messagingEntrypoint, ?string $targetChannel): void
     {
         $message = $this->show($messageId);
         $hasPolledChannel = $message->getHeaders()->containsKey(MessageHeaders::POLLED_CHANNEL_NAME);
         $hasInboundRequestChannel = $message->getHeaders()->containsKey(MessageHeaders::INBOUND_REQUEST_CHANNEL);
         $hasRoutingSlip = $message->getHeaders()->containsKey(MessageHeaders::ROUTING_SLIP);
 
-        if (! $hasPolledChannel && ! $hasInboundRequestChannel && ! $hasRoutingSlip) {
+        if ($targetChannel === null && ! $hasPolledChannel && ! $hasInboundRequestChannel && ! $hasRoutingSlip) {
             throw InvalidArgumentException::create(ErrorChannelExceptionMessages::cannotReplyToDeadLetterMessage($messageId));
         }
 
-        if ($hasPolledChannel) {
+        if ($targetChannel !== null) {
+            $entrypoint = $targetChannel;
+        } elseif ($hasPolledChannel) {
             $entrypoint = $message->getHeaders()->get(MessageHeaders::POLLED_CHANNEL_NAME);
         } elseif ($hasInboundRequestChannel) {
             $entrypoint = $message->getHeaders()->get(MessageHeaders::INBOUND_REQUEST_CHANNEL);
