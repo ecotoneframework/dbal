@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Test\Ecotone\Dbal\Integration;
 
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Api\Dbal\ExtensionObject\DbalBackedMessageChannelBuilder;
-use Ecotone\Api\Dbal\ExtensionObject\MultiTenantConfiguration;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\Lite\Test\FlowTestSupport;
-use Ecotone\Test\LicenceTesting;
+use Ecotone\Dbal\DbalBackedMessageChannelBuilder;
+use Ecotone\Dbal\MultiTenant\MultiTenantConfiguration;
+use Ecotone\Lite\EcotoneLite;
+use Ecotone\Lite\Test\FlowTestSupport;
+use Ecotone\Messaging\Config\ModulePackageList;
+use Ecotone\Messaging\Config\ServiceConfiguration;
+use Enqueue\Dbal\DbalConnectionFactory;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 use Test\Ecotone\Dbal\Fixture\AsynchronousChannelTransaction\OrderRegisteringGateway;
 use Test\Ecotone\Dbal\Fixture\AsynchronousChannelTransaction\OrderService;
@@ -31,12 +32,15 @@ final class ReconnectTest extends DbalMessagingTestCase
 
         $connectionFactory = $this->connectionForTenantA();
 
+        // Create the necessary database tables
+        $connectionFactory->createContext()->createDataBaseTable();
+
         $ecotone = $this->bootstrapEcotone([
             DbalConnectionFactory::class => $connectionFactory,
         ]);
 
         self::assertCount(0, $ecotone
-            ->sendCommandWithRouting('order.register', 'milk')
+            ->sendCommandWithRoutingKey('order.register', 'milk')
             ->sendQueryWithRouting('order.getRegistered'));
 
         $connectionFactory->createContext()->getDbalConnection()->close();
@@ -55,6 +59,9 @@ final class ReconnectTest extends DbalMessagingTestCase
 
         $connectionFactory = $this->connectionForTenantA();
 
+        // Create the necessary database tables
+        $connectionFactory->createContext()->createDataBaseTable();
+
         $ecotone = $this->bootstrapEcotone([
             'tenant_a_connection' => $connectionFactory,
         ], [
@@ -67,7 +74,7 @@ final class ReconnectTest extends DbalMessagingTestCase
         ]);
 
         self::assertCount(0, $ecotone
-            ->sendCommandWithRouting('order.register', 'milk', metadata: ['tenant' => 'tenant_a'])
+            ->sendCommandWithRoutingKey('order.register', 'milk', metadata: ['tenant' => 'tenant_a'])
             ->sendQueryWithRouting('order.getRegistered', metadata: ['tenant' => 'tenant_a']));
 
         $connectionFactory->createContext()->getDbalConnection()->close();
@@ -80,14 +87,17 @@ final class ReconnectTest extends DbalMessagingTestCase
 
     private function bootstrapEcotone(array $services, array $extensionObjects = []): FlowTestSupport
     {
-        return $this->bootstrapFlowTesting(
+        return EcotoneLite::bootstrapFlowTesting(
             [OrderService::class, OrderRegisteringGateway::class],
             containerOrAvailableServices: array_merge($services, [new OrderService()]),
-            extensionObjects: array_merge([DbalBackedMessageChannelBuilder::create('orders'), DbalBackedMessageChannelBuilder::create('processOrders'), ], $extensionObjects),
-            enabledModules: [ModulePackageList::DBAL_PACKAGE, ],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withEnvironment('prod')
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::ASYNCHRONOUS_PACKAGE]))
+                ->withExtensionObjects(array_merge([
+                    DbalBackedMessageChannelBuilder::create('orders'),
+                    DbalBackedMessageChannelBuilder::create('processOrders'),
+                ], $extensionObjects)),
             pathToRootCatalog: __DIR__ . '/../../',
-            licenceKey: LicenceTesting::VALID_LICENCE,
-            environment: 'prod',
         );
     }
 }

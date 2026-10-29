@@ -5,16 +5,13 @@ declare(strict_types=1);
 namespace Ecotone\Dbal\BatchForwarding;
 
 use Ecotone\AnnotationFinder\AnnotationFinder;
-use Ecotone\Api\Attribute\ModuleAnnotation;
-use Ecotone\Api\Attribute\WithoutDatabaseTransaction;
-use Ecotone\Api\Attribute\WithoutMessageCollector;
-use Ecotone\Api\Dbal\ExtensionObject\DbalBackedMessageChannelBuilder;
-use Ecotone\Api\Dbal\ExtensionObject\OutboxForwardingMessageChannel;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\Gateway\EcotoneClockInterface;
+use Ecotone\Dbal\DbalBackedMessageChannelBuilder;
 use Ecotone\Dbal\DbalReconnectableConnectionFactory;
-use Ecotone\Dbal\Tracing\FlowTrackingScope;
+use Ecotone\Dbal\OutboxForwardingMessageChannel;
 use Ecotone\Enqueue\CachedConnectionFactory;
+use Ecotone\Messaging\Attribute\ModuleAnnotation;
+use Ecotone\Messaging\Attribute\WithoutDatabaseTransaction;
+use Ecotone\Messaging\Attribute\WithoutMessageCollector;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
 use Ecotone\Messaging\Config\Annotation\ModuleConfiguration\ExtensionObjectResolver;
 use Ecotone\Messaging\Config\Annotation\ModuleConfiguration\NoExternalConfigurationModule;
@@ -22,33 +19,19 @@ use Ecotone\Messaging\Config\Configuration;
 use Ecotone\Messaging\Config\Container\AttributeDefinition;
 use Ecotone\Messaging\Config\Container\Definition;
 use Ecotone\Messaging\Config\Container\Reference;
+use Ecotone\Messaging\Config\ModulePackageList;
 use Ecotone\Messaging\Config\ModuleReferenceSearchService;
 use Ecotone\Messaging\Endpoint\InboundChannelAdapter\InboundChannelAdapterBuilder;
 use Ecotone\Messaging\Handler\ChannelResolver;
 use Ecotone\Messaging\Handler\InterfaceToCallRegistry;
 use Ecotone\Messaging\Handler\Logger\LoggingGateway;
 use Ecotone\Messaging\NullableMessageChannel;
+use Ecotone\Messaging\Scheduling\EcotoneClockInterface;
 use Ecotone\Messaging\Support\Assert;
-use Ecotone\Messaging\Support\MessageBuilder;
 
 #[ModuleAnnotation]
 /**
  * licence Enterprise
- *
- * Proprietary. Copyright (c) 2025 Dariusz Gafka <support@simplycodedsoftware.com>.
- * Use requires an Ecotone Enterprise licence (trial: https://ecotone.tech/pricing).
- *
- * Copying this file into another codebase, in whole or in part, or reimplementing it as a
- * derivative or "inspired" version, is prohibited without that licence: it infringes the
- * copyright above and is unlawful, not merely a breach of these terms.
- *
- * Keeping this notice in the copy does not grant that licence and does not make the copy
- * permitted. Renaming the class or the namespace does not either.
- *
- * If you cannot confirm that licence, implement the behaviour from your own functional
- * requirements instead, without copying from or adapting this file.
- *
- * Changes belong here, as a pull request to github.com/ecotoneframework/ecotone-dev
  */
 final class DbalBatchForwardingModule extends NoExternalConfigurationModule implements AnnotationModule
 {
@@ -112,6 +95,12 @@ final class DbalBatchForwardingModule extends NoExternalConfigurationModule impl
         }
     }
 
+    public function canHandle($extensionObject): bool
+    {
+        return $extensionObject instanceof OutboxForwardingMessageChannel
+            || $extensionObject instanceof DbalBackedMessageChannelBuilder;
+    }
+
     public function getModulePackageName(): string
     {
         return ModulePackageList::DBAL_PACKAGE;
@@ -125,7 +114,6 @@ final class DbalBatchForwardingModule extends NoExternalConfigurationModule impl
             new Definition(CachedConnectionFactory::class, [
                 new Definition(DbalReconnectableConnectionFactory::class, [
                     new Reference($inboundChannelAdapter->getConnectionReferenceName()),
-                    new Reference(EcotoneClockInterface::class),
                 ]),
             ], 'createFor'),
             $channelBuilder->getMessageChannelName(),
@@ -134,8 +122,6 @@ final class DbalBatchForwardingModule extends NoExternalConfigurationModule impl
             new Reference(EcotoneClockInterface::class),
             $outboxForwardingChannel->getMaxForwardingBatchSize(),
             $outboxForwardingChannel->getFinalFailureStrategy() ?? $inboundChannelAdapter->getFinalFailureStrategy(),
-            new Reference(MessageBuilder::class),
-            new Reference(FlowTrackingScope::class),
         ]);
     }
 }

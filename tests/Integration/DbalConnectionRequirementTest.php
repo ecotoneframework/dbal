@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Test\Ecotone\Dbal\Integration;
 
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\Lite\EcotoneLite;
+use Ecotone\Lite\EcotoneLite;
 use Ecotone\Lite\InMemoryPSRContainer;
 use Ecotone\Messaging\Config\ConfigurationException;
+use Ecotone\Messaging\Config\ModulePackageList;
+use Ecotone\Messaging\Config\ServiceConfiguration;
+use Enqueue\Dbal\DbalConnectionFactory;
 use PHPUnit\Framework\TestCase;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 use Test\Ecotone\Dbal\Fixture\Calendar\Meeting;
@@ -21,14 +22,15 @@ final class DbalConnectionRequirementTest extends TestCase
     public function test_throws_configuration_exception_when_dbal_connection_factory_is_not_configured(): void
     {
         $this->expectException(ConfigurationException::class);
-        $this->expectExceptionMessage("Dbal module requires 'Ecotone\Api\Dbal\DbalConnectionFactory' to be configured");
+        $this->expectExceptionMessage("Dbal module requires 'Enqueue\Dbal\DbalConnectionFactory' to be configured");
 
         EcotoneLite::bootstrap(
             classesToResolve: [Meeting::class],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withEnvironment('prod')
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
+                ->withNamespaces([]),
             pathToRootCatalog: __DIR__ . '/../../',
-            namespaces: [],
-            environment: 'prod',
         );
     }
 
@@ -39,10 +41,11 @@ final class DbalConnectionRequirementTest extends TestCase
         $ecotone = EcotoneLite::bootstrap(
             classesToResolve: [Meeting::class],
             containerOrAvailableServices: [DbalConnectionFactory::class => $connectionFactory],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withEnvironment('prod')
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
+                ->withNamespaces([]),
             pathToRootCatalog: __DIR__ . '/../../',
-            namespaces: [],
-            environment: 'prod',
         );
 
         self::assertNotNull($ecotone);
@@ -55,10 +58,11 @@ final class DbalConnectionRequirementTest extends TestCase
         $ecotone = EcotoneLite::bootstrap(
             classesToResolve: [Meeting::class],
             containerOrAvailableServices: InMemoryPSRContainer::createFromAssociativeArray([DbalConnectionFactory::class => $connectionFactory]),
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withEnvironment('prod')
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
+                ->withNamespaces([]),
             pathToRootCatalog: __DIR__ . '/../../',
-            namespaces: [],
-            environment: 'prod',
         );
 
         self::assertNotNull($ecotone);

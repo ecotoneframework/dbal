@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Test\Ecotone\Dbal\Integration\Consumer;
 
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Api\Dbal\ExtensionObject\DbalBackedMessageChannelBuilder;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\ExtensionObject\PollingMetadata;
-use Ecotone\Api\Messaging\PollableChannel;
-use Ecotone\Test\ChannelTestSupport;
+use Ecotone\Dbal\DbalBackedMessageChannelBuilder;
+use Ecotone\Lite\EcotoneLite;
+use Ecotone\Messaging\Config\ModulePackageList;
+use Ecotone\Messaging\Config\ServiceConfiguration;
+use Ecotone\Messaging\Endpoint\PollingMetadata;
+use Ecotone\Messaging\PollableChannel;
+use Enqueue\Dbal\DbalConnectionFactory;
 use Symfony\Component\Uid\Uuid;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 
@@ -24,22 +25,26 @@ final class ExecutionTimeLimitReceiveTimeoutTest extends DbalMessagingTestCase
     {
         $channelName = Uuid::v7()->toRfc4122();
 
-        $ecotoneLite = $this->bootstrapFlowTesting(
+        $ecotoneLite = EcotoneLite::bootstrapFlowTesting(
             containerOrAvailableServices: [
                 DbalConnectionFactory::class => $this->getConnectionFactory(),
             ],
-            extensionObjects: [DbalBackedMessageChannelBuilder::create($channelName)->withReceiveTimeout(200)],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
+                ->withExtensionObjects([
+                    DbalBackedMessageChannelBuilder::create($channelName)
+                        ->withReceiveTimeout(200),
+                ])
         );
 
         /** @var PollableChannel $messageChannel */
-        $messageChannel = ChannelTestSupport::of($ecotoneLite)->getMessageChannel($channelName);
+        $messageChannel = $ecotoneLite->getMessageChannel($channelName);
 
         $startedAt = microtime(true);
 
         $receivedMessage = $messageChannel->receiveWithTimeout(
             PollingMetadata::create('consumer')
-                ->withExecutionTimeLimitInMilliseconds(5000)
+                ->setExecutionTimeLimitInMilliseconds(5000)
         );
 
         $elapsedInMilliseconds = (microtime(true) - $startedAt) * 1000;

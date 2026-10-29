@@ -5,30 +5,19 @@ declare(strict_types=1);
 namespace Ecotone\Dbal\MultiTenant\Module;
 
 use Ecotone\AnnotationFinder\AnnotationFinder;
-use Ecotone\Api\Attribute\AsynchronousRunningEndpoint;
-use Ecotone\Api\Attribute\ConsoleCommand;
-use Ecotone\Api\Attribute\MessageGateway;
-use Ecotone\Api\Attribute\ModuleAnnotation;
-use Ecotone\Api\Attribute\PropagateHeaders;
-use Ecotone\Api\Dbal\Attribute\MultiTenantConnection;
-use Ecotone\Api\Dbal\Attribute\MultiTenantObjectManager;
-use Ecotone\Api\Dbal\Attribute\OnTenantActivation;
-use Ecotone\Api\Dbal\Attribute\OnTenantDeactivation;
-use Ecotone\Api\Dbal\Attribute\WithTenantResolver;
-use Ecotone\Api\Dbal\ExtensionObject\MultiTenantConfiguration;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\ExtensionObject\SimpleMessageChannelBuilder;
-use Ecotone\Api\Gateway\CommandBus;
-use Ecotone\Api\Gateway\EventBus;
-use Ecotone\Api\Gateway\QueryBus;
-use Ecotone\Api\Interceptor\Precedence;
+use Ecotone\Dbal\Attribute\WithTenantResolver;
 use Ecotone\Dbal\MultiTenant\HeaderBasedMultiTenantConnectionFactory;
+use Ecotone\Dbal\MultiTenant\MultiTenantConfiguration;
 use Ecotone\Dbal\MultiTenant\MultiTenantConnectionFactory;
 use Ecotone\Dbal\MultiTenant\MultiTenantHeaderResolver;
+use Ecotone\Messaging\Attribute\AsynchronousRunningEndpoint;
 use Ecotone\Messaging\Attribute\ChannelAdapter;
-use Ecotone\Messaging\Attribute\EndpointAnnotation;
 use Ecotone\Messaging\Attribute\MessageConsumer;
+use Ecotone\Messaging\Attribute\MessageGateway;
+use Ecotone\Messaging\Attribute\ModuleAnnotation;
+use Ecotone\Messaging\Attribute\PropagateHeaders;
 use Ecotone\Messaging\Channel\DynamicChannel\ReceivingStrategy\RoundRobinReceivingStrategy;
+use Ecotone\Messaging\Channel\SimpleMessageChannelBuilder;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
 use Ecotone\Messaging\Config\Annotation\ModuleConfiguration\ExtensionObjectResolver;
 use Ecotone\Messaging\Config\Annotation\ModuleConfiguration\NoExternalConfigurationModule;
@@ -36,14 +25,19 @@ use Ecotone\Messaging\Config\Configuration;
 use Ecotone\Messaging\Config\ConfigurationException;
 use Ecotone\Messaging\Config\Container\Definition;
 use Ecotone\Messaging\Config\Container\Reference;
+use Ecotone\Messaging\Config\ModulePackageList;
 use Ecotone\Messaging\Config\ModuleReferenceSearchService;
 use Ecotone\Messaging\Gateway\MessagingEntrypointService;
 use Ecotone\Messaging\Handler\InterfaceToCallRegistry;
 use Ecotone\Messaging\Handler\Logger\LoggingGateway;
 use Ecotone\Messaging\Handler\Processor\MethodInvoker\AroundInterceptorBuilder;
 use Ecotone\Messaging\Handler\Processor\MethodInvoker\MethodInterceptorBuilder;
+use Ecotone\Messaging\Precedence;
 use Ecotone\Messaging\Support\LicensingException;
+use Ecotone\Modelling\CommandBus;
+use Ecotone\Modelling\EventBus;
 use Ecotone\Modelling\MessageHandling\MetadataPropagator\MessageHeadersPropagatorInterceptor;
+use Ecotone\Modelling\QueryBus;
 use Psr\Container\ContainerInterface;
 
 #[ModuleAnnotation]
@@ -55,12 +49,10 @@ final class MultiTenantConnectionFactoryModule extends NoExternalConfigurationMo
     /**
      * @param array<int, string> $tenantResolverPlacements
      * @param array<int, string> $invalidTenantResolverPlacements
-     * @param array<int, string> $multiTenantAttributePlacements
      */
     private function __construct(
         private array $tenantResolverPlacements,
         private array $invalidTenantResolverPlacements,
-        private array $multiTenantAttributePlacements,
     ) {
     }
 
@@ -68,7 +60,6 @@ final class MultiTenantConnectionFactoryModule extends NoExternalConfigurationMo
     {
         $allPlacements = [];
         $invalid = [];
-        $multiTenantAttributePlacements = [];
         foreach ($annotationRegistrationService->findAnnotatedMethods(WithTenantResolver::class) as $annotatedMethod) {
             $location = $annotatedMethod->getClassName() . '::' . $annotatedMethod->getMethodName();
             $allPlacements[] = $location;
@@ -85,65 +76,22 @@ final class MultiTenantConnectionFactoryModule extends NoExternalConfigurationMo
             }
         }
 
-        foreach ([OnTenantActivation::class, OnTenantDeactivation::class] as $attributeClassName) {
-            foreach ($annotationRegistrationService->findAnnotatedMethods($attributeClassName) as $annotatedMethod) {
-                $multiTenantAttributePlacements[] = $attributeClassName . ' on ' . $annotatedMethod->getClassName() . '::' . $annotatedMethod->getMethodName();
-            }
-        }
-
-        foreach (self::findMultiTenantParameterAttributePlacements($annotationRegistrationService, $interfaceToCallRegistry) as $placement) {
-            $multiTenantAttributePlacements[] = $placement;
-        }
-
-        return new self($allPlacements, $invalid, array_values(array_unique($multiTenantAttributePlacements)));
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private static function findMultiTenantParameterAttributePlacements(AnnotationFinder $annotationRegistrationService, InterfaceToCallRegistry $interfaceToCallRegistry): array
-    {
-        $placements = [];
-
-        foreach ($annotationRegistrationService->findAnnotatedMethods(EndpointAnnotation::class) as $annotatedMethod) {
-            $interfaceToCall = $interfaceToCallRegistry->getFor($annotatedMethod->getClassName(), $annotatedMethod->getMethodName());
-
-            foreach ($interfaceToCall->getInterfaceParameters() as $interfaceParameter) {
-                foreach ([MultiTenantConnection::class, MultiTenantObjectManager::class] as $attributeClassName) {
-                    if ($interfaceParameter->hasAnnotation($attributeClassName)) {
-                        $placements[] = $attributeClassName . ' on ' . $annotatedMethod->getClassName() . '::' . $annotatedMethod->getMethodName() . '($' . $interfaceParameter->getName() . ')';
-                    }
-                }
-            }
-        }
-
-        return $placements;
+        return new self($allPlacements, $invalid);
     }
 
     public function prepare(Configuration $messagingConfiguration, array $extensionObjects, ModuleReferenceSearchService $moduleReferenceSearchService, InterfaceToCallRegistry $interfaceToCallRegistry): void
     {
         if ($this->invalidTenantResolverPlacements !== []) {
-            $placements = implode(', ', $this->invalidTenantResolverPlacements);
-            throw ConfigurationException::create(
-                "#[WithTenantResolver] on {$placements} is invalid: it may only be placed on an inbound channel adapter method — #[KafkaConsumer], #[RabbitConsumer] or #[Scheduled] — where messages arrive from outside the application without a tenant header. "
-                . 'Internal Message Channels — including those used by synchronous and asynchronous #[CommandHandler] / #[EventHandler] / #[QueryHandler] / #[InternalHandler] handlers — already carry the tenant context propagated from the originating bus call, so there is no header to derive there. '
-                . "Remove #[WithTenantResolver] from {$placements}; if the handler processes messages that arrive from outside the application, place it on the #[KafkaConsumer], #[RabbitConsumer] or #[Scheduled] method that receives them instead."
-            );
+            throw ConfigurationException::create(sprintf(
+                'WithTenantResolver attribute on %s is invalid. WithTenantResolver may only be applied to inbound channel adapter methods (e.g. #[KafkaConsumer], #[AmqpConsumer], #[Scheduled]) where messages may arrive from outside the application without a tenant header. Internal Message Channels — including those used by synchronous and asynchronous CommandHandler / EventHandler / QueryHandler / ServiceActivator handlers — already carry the tenant context propagated from the originating bus call, so there is no header to derive there. If an asynchronous handler is processing externally-arrived messages, attach #[WithTenantResolver] to the inbound channel adapter that produces those messages, not to the handler.',
+                implode(', ', $this->invalidTenantResolverPlacements)
+            ));
         }
 
         if ($this->tenantResolverPlacements !== [] && ! $messagingConfiguration->isRunningForEnterpriseLicence()) {
             throw LicensingException::create(sprintf(
-                'WithTenantResolver attribute on %s requires Ecotone Enterprise licence. See https://docs.ecotone.tech/enterprise.',
+                'WithTenantResolver attribute on %s requires Ecotone Enterprise licence.',
                 implode(', ', $this->tenantResolverPlacements)
-            ));
-        }
-
-        $multiTenantConfigurations = ExtensionObjectResolver::resolve(MultiTenantConfiguration::class, $extensionObjects);
-
-        if (($multiTenantConfigurations !== [] || $this->multiTenantAttributePlacements !== []) && ! $messagingConfiguration->isRunningForEnterpriseLicence()) {
-            throw LicensingException::create(sprintf(
-                'Multi-tenancy requires Ecotone Enterprise licence when using MultiTenantConfiguration or multi-tenant attributes (%s). See https://docs.ecotone.tech/enterprise.',
-                $this->multiTenantAttributePlacements === [] ? 'configuration present' : implode(', ', $this->multiTenantAttributePlacements)
             ));
         }
 
@@ -154,14 +102,7 @@ final class MultiTenantConnectionFactoryModule extends NoExternalConfigurationMo
             SimpleMessageChannelBuilder::createPublishSubscribeChannel(HeaderBasedMultiTenantConnectionFactory::TENANT_DEACTIVATED_CHANNEL_NAME)
         );
 
-        if ($multiTenantConfigurations !== []) {
-            $messagingConfiguration->addCompilerPass(new IncludeTenantHeaderInLogContext(
-                array_values(array_unique(array_map(
-                    fn (MultiTenantConfiguration $multiTenantConfig): string => $multiTenantConfig->tenantHeaderName,
-                    $multiTenantConfigurations
-                )))
-            ));
-        }
+        $multiTenantConfigurations = ExtensionObjectResolver::resolve(MultiTenantConfiguration::class, $extensionObjects);
 
         foreach ($multiTenantConfigurations as $multiTenantConfig) {
             $messagingConfiguration->registerServiceDefinition(
@@ -169,18 +110,18 @@ final class MultiTenantConnectionFactoryModule extends NoExternalConfigurationMo
                 new Definition(
                     HeaderBasedMultiTenantConnectionFactory::class,
                     [
-                        $multiTenantConfig->tenantHeaderName,
-                        $multiTenantConfig->tenantToConnectionMapping,
+                        $multiTenantConfig->getTenantHeaderName(),
+                        $multiTenantConfig->getTenantToConnectionMapping(),
                         Reference::to(MessagingEntrypointService::class),
                         Reference::to(ContainerInterface::class),
                         Reference::to(LoggingGateway::class),
                         new Definition(
                             RoundRobinReceivingStrategy::class,
                             [
-                                array_keys($multiTenantConfig->tenantToConnectionMapping),
+                                array_keys($multiTenantConfig->getTenantToConnectionMapping()),
                             ]
                         ),
-                        $multiTenantConfig->defaultConnectionName,
+                        $multiTenantConfig->getDefaultConnectionName(),
                     ]
                 )
             );
@@ -222,8 +163,7 @@ final class MultiTenantConnectionFactoryModule extends NoExternalConfigurationMo
                     EventBus::class . '||' .
                     AsynchronousRunningEndpoint::class  . '||' .
                     PropagateHeaders::class  . '||' .
-                    MessageGateway::class . '||' .
-                    ConsoleCommand::class
+                    MessageGateway::class
                 )
             );
 
@@ -233,7 +173,7 @@ final class MultiTenantConnectionFactoryModule extends NoExternalConfigurationMo
                 new Definition(
                     MultiTenantHeaderResolver::class,
                     [
-                        $multiTenantConfig->tenantHeaderName,
+                        $multiTenantConfig->getTenantHeaderName(),
                     ]
                 )
             );
@@ -248,6 +188,11 @@ final class MultiTenantConnectionFactoryModule extends NoExternalConfigurationMo
                 )
             );
         }
+    }
+
+    public function canHandle($extensionObject): bool
+    {
+        return $extensionObject instanceof MultiTenantConfiguration;
     }
 
     public function getModulePackageName(): string

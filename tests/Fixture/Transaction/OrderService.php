@@ -2,12 +2,11 @@
 
 namespace Test\Ecotone\Dbal\Fixture\Transaction;
 
-use Ecotone\Api\Attribute\CommandHandler;
-use Ecotone\Api\Attribute\QueryHandler;
-use Ecotone\Api\Attribute\Reference;
-use Ecotone\Api\Attribute\WithoutDatabaseTransaction;
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Enqueue\ConnectionFactory;
+use Ecotone\Messaging\Attribute\Parameter\Reference;
+use Ecotone\Modelling\Attribute\CommandHandler;
+use Ecotone\Modelling\Attribute\QueryHandler;
+use Enqueue\Dbal\DbalConnectionFactory;
+use Interop\Queue\ConnectionFactory;
 use InvalidArgumentException;
 
 /**
@@ -18,7 +17,6 @@ class OrderService
     public const ORDER_TABLE = 'orders';
 
     #[CommandHandler('order.prepare')]
-    #[WithoutDatabaseTransaction]
     public function prepare(#[Reference(DbalConnectionFactory::class)] ConnectionFactory $connectionFactory)
     {
         $connection = $connectionFactory->createContext()->getDbalConnection();
@@ -78,7 +76,7 @@ class OrderService
 
     private function doesTableExists(\Doctrine\DBAL\Connection $connection)
     {
-        $schemaManager = $connection->createSchemaManager();
+        $schemaManager = method_exists($connection, 'getSchemaManager') ? $connection->getSchemaManager() : $connection->createSchemaManager();
 
         return $schemaManager->tablesExist(['orders']);
     }

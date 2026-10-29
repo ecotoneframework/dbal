@@ -3,40 +3,34 @@
 namespace Ecotone\Dbal\Deduplication;
 
 use Ecotone\AnnotationFinder\AnnotationFinder;
-use Ecotone\Api\Attribute\AsynchronousRunningEndpoint;
-use Ecotone\Api\Attribute\Deduplicated;
-use Ecotone\Api\Attribute\ModuleAnnotation;
-use Ecotone\Api\Attribute\WithoutDatabaseTransaction;
-use Ecotone\Api\Dbal\ExtensionObject\DbalConfiguration;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\ExtensionObject\ServiceConfiguration;
-use Ecotone\Api\Gateway\EcotoneClockInterface;
-use Ecotone\Api\Interceptor\Precedence;
+use Ecotone\Dbal\Configuration\DbalConfiguration;
 use Ecotone\Dbal\Database\DbalTableManagerReference;
 use Ecotone\Dbal\Database\DeduplicationTableManager;
+use Ecotone\Messaging\Attribute\AsynchronousRunningEndpoint;
+use Ecotone\Messaging\Attribute\Deduplicated;
+use Ecotone\Messaging\Attribute\ModuleAnnotation;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
 use Ecotone\Messaging\Config\Annotation\ModuleConfiguration\ExtensionObjectResolver;
-use Ecotone\Messaging\Config\BootstrapConfiguration;
 use Ecotone\Messaging\Config\Configuration;
 use Ecotone\Messaging\Config\ConsoleCommandConfiguration;
-use Ecotone\Messaging\Config\ConsoleInvocationResolver;
-use Ecotone\Messaging\Config\Container\AttributeDefinition;
 use Ecotone\Messaging\Config\Container\Definition;
 use Ecotone\Messaging\Config\Container\Reference;
+use Ecotone\Messaging\Config\ModulePackageList;
 use Ecotone\Messaging\Config\ModuleReferenceSearchService;
-use Ecotone\Messaging\Endpoint\InboundChannelAdapter\InboundChannelAdapterBuilder;
+use Ecotone\Messaging\Config\ServiceConfiguration;
 use Ecotone\Messaging\Handler\InterfaceToCallRegistry;
 use Ecotone\Messaging\Handler\Logger\LoggingGateway;
 use Ecotone\Messaging\Handler\Processor\MethodInvoker\AroundInterceptorBuilder;
-use Ecotone\Messaging\Handler\ServiceActivator\MessageProcessorActivatorBuilder;
-use Ecotone\Messaging\NullableMessageChannel;
+use Ecotone\Messaging\Handler\ServiceActivator\ServiceActivatorBuilder;
+use Ecotone\Messaging\Precedence;
+use Ecotone\Messaging\Scheduling\EcotoneClockInterface;
 use Ecotone\Messaging\Support\LicensingException;
 
 #[ModuleAnnotation]
 /**
  * licence Apache-2.0
  */
-final class DeduplicationModule implements AnnotationModule
+class DeduplicationModule implements AnnotationModule
 {
     public const REMOVE_MESSAGE_AFTER_7_DAYS = 1000 * 60 * 60 * 24 * 7;
 
@@ -60,10 +54,8 @@ final class DeduplicationModule implements AnnotationModule
         $this->verifyEnterpriseFeatures($messagingConfiguration);
 
         $dbalConfiguration = ExtensionObjectResolver::resolveUnique(DbalConfiguration::class, $extensionObjects, DbalConfiguration::createWithDefaults());
-        $serviceConfiguration = ExtensionObjectResolver::resolveUnique(ServiceConfiguration::class, $extensionObjects, ServiceConfiguration::createWithDefaults());
 
-        $isDeduplicatedEnabled = $dbalConfiguration->deduplicatedEnabled;
-        $hasDeduplicatedHandlers = ! empty($this->annotationFinder->findAnnotatedMethods(Deduplicated::class));
+        $isDeduplicatedEnabled = $dbalConfiguration->isDeduplicatedEnabled();
         $connectionFactory     = $dbalConfiguration->getDeduplicationConnectionReference();
 
         $pointcut = Deduplicated::class;
@@ -71,28 +63,16 @@ final class DeduplicationModule implements AnnotationModule
             $pointcut .= '||' . AsynchronousRunningEndpoint::class;
         }
 
-        $consoleInvocationPrefix = ConsoleInvocationResolver::resolveConsolePrefix(ExtensionObjectResolver::resolveUnique(BootstrapConfiguration::class, $extensionObjects, BootstrapConfiguration::createWithDefaults()));
+        $shouldAutoInitialize = $dbalConfiguration->isAutomaticTableInitializationEnabled();
 
+        // Register the DeduplicationTableManager service
         $messagingConfiguration->registerServiceDefinition(
             DeduplicationTableManager::class,
             new Definition(DeduplicationTableManager::class, [
-                DbalHandledMessages::DEFAULT_DEDUPLICATION_TABLE,
-                ($isDeduplicatedEnabled || $hasDeduplicatedHandlers) && ! $dbalConfiguration->deduplicationInMemory,
-                $consoleInvocationPrefix,
-                $connectionFactory,
+                DeduplicationInterceptor::DEFAULT_DEDUPLICATION_TABLE,
+                $isDeduplicatedEnabled,
+                $shouldAutoInitialize,
             ])
-        );
-
-        $messagingConfiguration->registerServiceDefinition(
-            HandledMessages::class,
-            $dbalConfiguration->deduplicationInMemory
-                ? new Definition(InMemoryHandledMessages::class)
-                : new Definition(DbalHandledMessages::class, [
-                    new Reference($connectionFactory),
-                    $dbalConfiguration->deduplicationRemovalBatchSize,
-                    new Reference(DeduplicationTableManager::class),
-                    new Reference(EcotoneClockInterface::class),
-                ])
         );
 
         $messagingConfiguration->registerServiceDefinition(
@@ -100,10 +80,12 @@ final class DeduplicationModule implements AnnotationModule
             new Definition(
                 DeduplicationInterceptor::class,
                 [
-                    new Reference(HandledMessages::class),
+                    new Reference($connectionFactory),
                     new Reference(EcotoneClockInterface::class),
-                    $dbalConfiguration->minimumTimeToRemoveMessageInMilliseconds,
+                    $dbalConfiguration->minimumTimeToRemoveMessageFromDeduplication(),
+                    $dbalConfiguration->deduplicationRemovalBatchSize(),
                     new Reference(LoggingGateway::class),
+                    new Reference(DeduplicationTableManager::class),
                 ]
             )
         );
@@ -118,7 +100,7 @@ final class DeduplicationModule implements AnnotationModule
                 )
             )
             ->registerMessageHandler(
-                MessageProcessorActivatorBuilder::createForMethod(
+                ServiceActivatorBuilder::create(
                     DeduplicationInterceptor::class,
                     'removeExpiredMessages'
                 )->withInputChannelName($inputChannelName = 'ecotone.deduplication.removeExpiredMessages')
@@ -129,29 +111,20 @@ final class DeduplicationModule implements AnnotationModule
                 [],
                 'Removes expired message deduplication entries'
             ));
-
-        if ($isDeduplicatedEnabled) {
-            $messagingConfiguration->registerConsumer(
-                InboundChannelAdapterBuilder::create(
-                    NullableMessageChannel::CHANNEL_NAME,
-                    DeduplicationInterceptor::class,
-                    $interfaceToCallRegistry->getFor(DeduplicationInterceptor::class, 'removeExpiredMessages'),
-                )
-                    ->withEndpointId('ecotone.deduplication.cleanup')
-                    ->withEndpointAnnotations([new AttributeDefinition(WithoutDatabaseTransaction::class)]),
-            );
-        }
     }
 
     /**
      * @inheritDoc
      */
+    public function canHandle($extensionObject): bool
+    {
+        return $extensionObject instanceof DbalConfiguration;
+    }
+
     public function getModuleExtensions(ServiceConfiguration $serviceConfiguration, array $serviceExtensions): array
     {
-        $dbalConfiguration = ExtensionObjectResolver::resolveUnique(DbalConfiguration::class, $serviceExtensions, DbalConfiguration::createWithDefaults());
-
         return [
-            new DbalTableManagerReference(DeduplicationTableManager::class, $dbalConfiguration->getDeduplicationConnectionReference()),
+            new DbalTableManagerReference(DeduplicationTableManager::class),
         ];
     }
 
@@ -171,7 +144,7 @@ final class DeduplicationModule implements AnnotationModule
 
         if (! empty($deduplicatedClasses)) {
             $classNames = implode(', ', $deduplicatedClasses);
-            throw LicensingException::create("Deduplicated attribute on interfaces/gateways ({$classNames}) is available only with Ecotone Enterprise licence. This functionality requires enterprise mode to ensure proper gateway-level deduplication. See https://docs.ecotone.tech/enterprise for details.");
+            throw LicensingException::create("Deduplicated attribute on interfaces/gateways ({$classNames}) is available only with Ecotone Enterprise licence. This functionality requires enterprise mode to ensure proper gateway-level deduplication.");
         }
     }
 }

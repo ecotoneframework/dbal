@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Integration\DbalBusinessMethod;
 
 use DateTimeImmutable;
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\Lite\Test\FlowTestSupport;
 use Ecotone\Dbal\DbalConnection;
+use Ecotone\Lite\EcotoneLite;
+use Ecotone\Lite\Test\FlowTestSupport;
+use Ecotone\Messaging\Config\ModulePackageList;
+use Ecotone\Messaging\Config\ServiceConfiguration;
+use Enqueue\Dbal\DbalConnectionFactory;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 use Test\Ecotone\Dbal\Fixture\DbalBusinessInterface\ActivityService;
 use Test\Ecotone\Dbal\Fixture\DbalBusinessInterface\DateTimeToDayStringConverter;
@@ -86,7 +88,7 @@ final class InbuiltConvertersTest extends DbalMessagingTestCase
     {
         $this->setupActivityTable();
 
-        return $this->bootstrapFlowTesting(
+        return EcotoneLite::bootstrapFlowTesting(
             array_merge([ActivityService::class], array_keys($services)),
             array_merge(
                 [
@@ -94,9 +96,10 @@ final class InbuiltConvertersTest extends DbalMessagingTestCase
                 ],
                 $services
             ),
-            enabledModules: [ModulePackageList::DBAL_PACKAGE, ModulePackageList::JMS_CONVERTER_PACKAGE],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::JMS_CONVERTER_PACKAGE])),
             pathToRootCatalog: __DIR__ . '/../../',
-            addInMemoryStateStoredRepository: false,
+            addInMemoryStateStoredRepository: false
         );
     }
 }

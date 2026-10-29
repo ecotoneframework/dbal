@@ -3,39 +3,34 @@
 namespace Ecotone\Dbal\Configuration;
 
 use Ecotone\AnnotationFinder\AnnotationFinder;
-use Ecotone\Api\Attribute\ModuleAnnotation;
-use Ecotone\Api\Dbal\ExtensionObject\DbalBackedMessageChannelBuilder;
-use Ecotone\Api\Dbal\ExtensionObject\DbalConfiguration;
-use Ecotone\Api\Dbal\ExtensionObject\DbalConnectionReference;
-use Ecotone\Api\Dbal\ExtensionObject\DbalMessagePublisherConfiguration;
-use Ecotone\Api\ExtensionObject\MediaType;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\ExtensionObject\ServiceConfiguration;
-use Ecotone\Api\Gateway\MessagePublisher;
-use Ecotone\Api\Messaging\MessageHeaders;
 use Ecotone\Dbal\Database\DbalTableManagerReference;
 use Ecotone\Dbal\Database\EnqueueTableManager;
+use Ecotone\Dbal\DbalBackedMessageChannelBuilder;
 use Ecotone\Dbal\DbalOutboundChannelAdapterBuilder;
+use Ecotone\Messaging\Attribute\ModuleAnnotation;
 use Ecotone\Messaging\Channel\DeliveryConfirmation\Config\DeferredPublishingGatewayRegistration;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
 use Ecotone\Messaging\Config\Annotation\ModuleConfiguration\ExtensionObjectResolver;
-use Ecotone\Messaging\Config\BootstrapConfiguration;
 use Ecotone\Messaging\Config\Configuration;
 use Ecotone\Messaging\Config\ConfigurationException;
-use Ecotone\Messaging\Config\ConsoleInvocationResolver;
+use Ecotone\Messaging\Config\ModulePackageList;
 use Ecotone\Messaging\Config\ModuleReferenceSearchService;
+use Ecotone\Messaging\Config\ServiceConfiguration;
+use Ecotone\Messaging\Conversion\MediaType;
 use Ecotone\Messaging\Handler\Gateway\GatewayProxyBuilder;
 use Ecotone\Messaging\Handler\Gateway\ParameterToMessageConverter\GatewayHeaderBuilder;
 use Ecotone\Messaging\Handler\Gateway\ParameterToMessageConverter\GatewayHeadersBuilder;
 use Ecotone\Messaging\Handler\Gateway\ParameterToMessageConverter\GatewayHeaderValueBuilder;
 use Ecotone\Messaging\Handler\Gateway\ParameterToMessageConverter\GatewayPayloadBuilder;
 use Ecotone\Messaging\Handler\InterfaceToCallRegistry;
+use Ecotone\Messaging\MessageHeaders;
+use Ecotone\Messaging\MessagePublisher;
 
 #[ModuleAnnotation]
 /**
  * licence Apache-2.0
  */
-final class DbalPublisherModule implements AnnotationModule
+class DbalPublisherModule implements AnnotationModule
 {
     /**
      * @inheritDoc
@@ -54,18 +49,19 @@ final class DbalPublisherModule implements AnnotationModule
         $applicationConfiguration = ExtensionObjectResolver::resolveUnique(ServiceConfiguration::class, $extensionObjects, ServiceConfiguration::createWithDefaults());
 
         $dbalConfiguration = ExtensionObjectResolver::resolveUnique(DbalConfiguration::class, $extensionObjects, DbalConfiguration::createWithDefaults());
-        $consoleInvocationPrefix = ConsoleInvocationResolver::resolveConsolePrefix(ExtensionObjectResolver::resolveUnique(BootstrapConfiguration::class, $extensionObjects, BootstrapConfiguration::createWithDefaults()));
-        foreach (self::connectionsWithQueues($extensionObjects) as $connectionReferenceName => $hasMessageQueues) {
-            $messagingConfiguration->registerServiceDefinition(
-                EnqueueTableManager::referenceFor($connectionReferenceName),
-                new \Ecotone\Messaging\Config\Container\Definition(EnqueueTableManager::class, [
-                    EnqueueTableManager::DEFAULT_TABLE_NAME,
-                    $hasMessageQueues,
-                    $consoleInvocationPrefix,
-                    $connectionReferenceName,
-                ])
-            );
-        }
+        $dbalMessageChannels = ExtensionObjectResolver::resolve(DbalBackedMessageChannelBuilder::class, $extensionObjects);
+        $dbalPublishers = ExtensionObjectResolver::resolve(DbalMessagePublisherConfiguration::class, $extensionObjects);
+        $hasMessageQueues = ! empty($dbalMessageChannels) || ! empty($dbalPublishers);
+        $shouldAutoInitialize = $dbalConfiguration->isAutomaticTableInitializationEnabled();
+
+        $messagingConfiguration->registerServiceDefinition(
+            EnqueueTableManager::class,
+            new \Ecotone\Messaging\Config\Container\Definition(EnqueueTableManager::class, [
+                EnqueueTableManager::DEFAULT_TABLE_NAME,
+                $hasMessageQueues,
+                $shouldAutoInitialize,
+            ])
+        );
 
         foreach (ExtensionObjectResolver::resolve(DbalMessagePublisherConfiguration::class, $extensionObjects) as $dbalPublisher) {
             if (in_array($dbalPublisher->getReferenceName(), $registeredReferences)) {
@@ -73,7 +69,7 @@ final class DbalPublisherModule implements AnnotationModule
             }
 
             $registeredReferences[] = $dbalPublisher->getReferenceName();
-            $mediaType              = $dbalPublisher->getOutputDefaultConversionMediaType() ? $dbalPublisher->getOutputDefaultConversionMediaType() : $applicationConfiguration->defaultSerializationMediaType;
+            $mediaType              = $dbalPublisher->getOutputDefaultConversionMediaType() ? $dbalPublisher->getOutputDefaultConversionMediaType() : $applicationConfiguration->getDefaultSerializationMediaType();
 
             $messagingConfiguration = $messagingConfiguration
                 ->registerGatewayBuilder(
@@ -131,29 +127,20 @@ final class DbalPublisherModule implements AnnotationModule
     /**
      * @inheritDoc
      */
-    public function getModuleExtensions(ServiceConfiguration $serviceConfiguration, array $serviceExtensions): array
+    public function canHandle($extensionObject): bool
     {
-        return array_map(
-            static fn (string $connectionReferenceName) => new DbalTableManagerReference(EnqueueTableManager::referenceFor($connectionReferenceName), $connectionReferenceName),
-            array_keys(self::connectionsWithQueues($serviceExtensions))
-        );
+        return
+            $extensionObject instanceof DbalMessagePublisherConfiguration
+            || $extensionObject instanceof ServiceConfiguration
+            || $extensionObject instanceof DbalBackedMessageChannelBuilder
+            || $extensionObject instanceof DbalConfiguration;
     }
 
-    /**
-     * @param array<object> $extensionObjects
-     * @return array<string, bool> connection reference name => whether a channel or publisher uses it
-     */
-    private static function connectionsWithQueues(array $extensionObjects): array
+    public function getModuleExtensions(ServiceConfiguration $serviceConfiguration, array $serviceExtensions): array
     {
-        $connections = [DbalConnectionReference::DEFAULT => false];
-        foreach (ExtensionObjectResolver::resolve(DbalBackedMessageChannelBuilder::class, $extensionObjects) as $channel) {
-            $connections[$channel->connectionReferenceName] = true;
-        }
-        foreach (ExtensionObjectResolver::resolve(DbalMessagePublisherConfiguration::class, $extensionObjects) as $publisher) {
-            $connections[$publisher->getConnectionReference()] = true;
-        }
-
-        return $connections;
+        return [
+            new DbalTableManagerReference(EnqueueTableManager::class),
+        ];
     }
 
     public function getModulePackageName(): string

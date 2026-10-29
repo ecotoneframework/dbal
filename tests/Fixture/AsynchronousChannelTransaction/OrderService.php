@@ -4,14 +4,13 @@ namespace Test\Ecotone\Dbal\Fixture\AsynchronousChannelTransaction;
 
 use Doctrine\DBAL\Schema\Table;
 use Doctrine\DBAL\Types\Types;
-use Ecotone\Api\Attribute\Asynchronous;
-use Ecotone\Api\Attribute\CommandHandler;
-use Ecotone\Api\Attribute\QueryHandler;
-use Ecotone\Api\Attribute\Reference;
-use Ecotone\Api\Attribute\WithoutDatabaseTransaction;
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Api\Dbal\ManagerRegistryConnectionFactory;
-use Ecotone\Enqueue\ConnectionFactory;
+use Ecotone\Messaging\Attribute\Asynchronous;
+use Ecotone\Messaging\Attribute\Parameter\Reference;
+use Ecotone\Modelling\Attribute\CommandHandler;
+use Ecotone\Modelling\Attribute\QueryHandler;
+use Enqueue\Dbal\DbalConnectionFactory;
+use Enqueue\Dbal\ManagerRegistryConnectionFactory;
+use Interop\Queue\ConnectionFactory;
 use InvalidArgumentException;
 
 /**
@@ -46,11 +45,11 @@ class OrderService
     }
 
     #[CommandHandler('order.register_with_table_creation', 'orderRegister2')]
-    #[WithoutDatabaseTransaction]
     public function registerWithTableCreation(string $order, OrderRegisteringGateway $orderRegisteringGateway, #[Reference(DbalConnectionFactory::class)] ConnectionFactory $connection): void
     {
         $connection = $connection->createContext()->getDbalConnection();
-        $schemaManager = $connection->createSchemaManager();
+        // Handle both DBAL 3.x (getSchemaManager) and 4.x (createSchemaManager)
+        $schemaManager = method_exists($connection, 'getSchemaManager') ? $connection->getSchemaManager() : $connection->createSchemaManager();
 
         if ($schemaManager->tablesExist(['test_table'])) {
             $schemaManager->dropTable('test_table');

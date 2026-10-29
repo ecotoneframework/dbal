@@ -4,15 +4,13 @@ declare(strict_types=1);
 
 namespace Test\Ecotone\Dbal\Fixture\InstantRetryTransaction;
 
-use Ecotone\Api\Attribute\Asynchronous;
-use Ecotone\Api\Attribute\CommandHandler;
-use Ecotone\Api\Attribute\Reference;
-use Ecotone\Api\Gateway\CommandBus;
-use Ecotone\Api\Gateway\EcotoneClockInterface;
-use Ecotone\Dbal\Connection\DbalContext;
 use Ecotone\Dbal\DbalReconnectableConnectionFactory;
 use Ecotone\Enqueue\CachedConnectionFactory;
-use Ecotone\Enqueue\ConnectionFactory;
+use Ecotone\Messaging\Attribute\Asynchronous;
+use Ecotone\Modelling\Attribute\CommandHandler;
+use Ecotone\Modelling\CommandBus;
+use Enqueue\Dbal\DbalContext;
+use Interop\Queue\ConnectionFactory;
 
 /**
  * licence Apache-2.0
@@ -33,9 +31,9 @@ final class CommandDispatchingAsyncHandler
     }
 
     #[CommandHandler('execute.sql.command')]
-    public function executeSqlCommand(string $payload, #[Reference] EcotoneClockInterface $clock): void
+    public function executeSqlCommand(string $payload): void
     {
-        $connection = $this->getTransactionalConnection($clock);
+        $connection = $this->getTransactionalConnection();
 
         $this->commandHandlerCallCount++;
         if ($this->commandHandlerCallCount === 1) {
@@ -53,10 +51,10 @@ final class CommandDispatchingAsyncHandler
         return $this->commandHandlerCallCount;
     }
 
-    private function getTransactionalConnection(EcotoneClockInterface $clock): \Doctrine\DBAL\Connection
+    private function getTransactionalConnection(): \Doctrine\DBAL\Connection
     {
         $factory = CachedConnectionFactory::createFor(
-            new DbalReconnectableConnectionFactory($this->connectionFactory, $clock),
+            new DbalReconnectableConnectionFactory($this->connectionFactory),
         );
 
         /** @var DbalContext $context */

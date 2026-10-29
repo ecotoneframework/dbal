@@ -3,15 +3,12 @@
 namespace Ecotone\Dbal;
 
 use Doctrine\DBAL\Exception\ConnectionException;
-use Ecotone\Api\ExtensionObject\PollingMetadata;
-use Ecotone\Api\Messaging\Message;
 use Ecotone\Dbal\Database\EnqueueTableManager;
-use Ecotone\Dbal\Database\MissingTableFailure;
 use Ecotone\Enqueue\CachedConnectionFactory;
 use Ecotone\Enqueue\EnqueueInboundChannelAdapter;
 use Ecotone\Enqueue\InboundMessageConverter;
 use Ecotone\Messaging\Conversion\ConversionService;
-use Throwable;
+use Enqueue\Dbal\DbalContext;
 
 /**
  * licence Apache-2.0
@@ -30,17 +27,16 @@ class DbalInboundChannelAdapter extends EnqueueInboundChannelAdapter
         parent::__construct($connectionFactory, $declareOnStartup, $queueName, $receiveTimeoutInMilliseconds, $inboundMessageConverter, $conversionService);
     }
 
-    public function receiveWithTimeout(PollingMetadata $pollingMetadata): ?Message
-    {
-        try {
-            return parent::receiveWithTimeout($pollingMetadata);
-        } catch (Throwable $failure) {
-            throw MissingTableFailure::explained($failure, $this->tableManager);
-        }
-    }
-
     public function initialize(): void
     {
+        /** @var DbalContext $context */
+        $context = $this->connectionFactory->createContext();
+
+        if (! $this->tableManager->shouldBeInitializedAutomatically()) {
+            return;
+        }
+
+        $this->tableManager->createTable($context->getDbalConnection());
     }
 
     public function connectionException(): array

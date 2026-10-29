@@ -4,26 +4,27 @@ declare(strict_types=1);
 
 namespace Test\Ecotone\Dbal\Integration\MultiTenant;
 
-use Ecotone\Api\Attribute\Asynchronous;
-use Ecotone\Api\Attribute\Before;
-use Ecotone\Api\Attribute\CommandHandler;
-use Ecotone\Api\Attribute\Headers;
-use Ecotone\Api\Attribute\QueryHandler;
-use Ecotone\Api\Attribute\Scheduled;
-use Ecotone\Api\Dbal\Attribute\WithTenantResolver;
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Api\Dbal\ExtensionObject\DbalConfiguration;
-use Ecotone\Api\Dbal\ExtensionObject\MultiTenantConfiguration;
-use Ecotone\Api\ExtensionObject\ExecutionPollingMetadata;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\ExtensionObject\PollingMetadata;
-use Ecotone\Api\ExtensionObject\SimpleMessageChannelBuilder;
-use Ecotone\Api\Lite\EcotoneLite;
-use Ecotone\Api\Lite\Test\FlowTestSupport;
-use Ecotone\Api\Messaging\Message;
+use Ecotone\Dbal\Attribute\WithTenantResolver;
+use Ecotone\Dbal\Configuration\DbalConfiguration;
+use Ecotone\Dbal\MultiTenant\MultiTenantConfiguration;
+use Ecotone\Lite\EcotoneLite;
+use Ecotone\Lite\Test\FlowTestSupport;
+use Ecotone\Messaging\Attribute\Asynchronous;
+use Ecotone\Messaging\Attribute\Interceptor\Before;
+use Ecotone\Messaging\Attribute\Parameter\Headers;
+use Ecotone\Messaging\Attribute\Scheduled;
+use Ecotone\Messaging\Channel\SimpleMessageChannelBuilder;
+use Ecotone\Messaging\Config\ModulePackageList;
+use Ecotone\Messaging\Config\ServiceConfiguration;
+use Ecotone\Messaging\Endpoint\ExecutionPollingMetadata;
+use Ecotone\Messaging\Endpoint\PollingMetadata;
+use Ecotone\Messaging\Message;
 use Ecotone\Messaging\Support\InvalidArgumentException;
+use Ecotone\Messaging\Support\MessageBuilder;
+use Ecotone\Modelling\Attribute\CommandHandler;
+use Ecotone\Modelling\Attribute\QueryHandler;
 use Ecotone\Test\LicenceTesting;
-use Ecotone\Test\StaticMessageBuilder;
+use Enqueue\Dbal\DbalConnectionFactory;
 use PHPUnit\Framework\TestCase;
 use Test\Ecotone\Dbal\Fixture\MultiTenant\FakeConnectionFactory;
 
@@ -54,7 +55,7 @@ final class ScheduledTenantResolverTest extends TestCase
                     return null;
                 }
                 $event = array_shift($this->pending);
-                return StaticMessageBuilder::withPayload($event['payload'])
+                return MessageBuilder::withPayload($event['payload'])
                     ->setHeader('source', $event['source'])
                     ->build();
             }
@@ -97,7 +98,7 @@ final class ScheduledTenantResolverTest extends TestCase
                 if ($event === null) {
                     return null;
                 }
-                return StaticMessageBuilder::withPayload($event['payload'])
+                return MessageBuilder::withPayload($event['payload'])
                     ->setHeader('source', $event['source'])
                     ->setHeader('tenant', $event['tenant'])
                     ->build();
@@ -125,7 +126,7 @@ final class ScheduledTenantResolverTest extends TestCase
                     return null;
                 }
                 $emitted = true;
-                return StaticMessageBuilder::withPayload('first')->setHeader('source', 'tenant_a')->build();
+                return MessageBuilder::withPayload('first')->setHeader('source', 'tenant_a')->build();
             }
         };
         $receiver = $this->newReceiver();
@@ -151,7 +152,7 @@ final class ScheduledTenantResolverTest extends TestCase
                     return null;
                 }
                 $emitted = true;
-                return StaticMessageBuilder::withPayload('first')->build();
+                return MessageBuilder::withPayload('first')->build();
             }
         };
         $receiver = $this->newReceiver();
@@ -177,7 +178,7 @@ final class ScheduledTenantResolverTest extends TestCase
                     return null;
                 }
                 $emitted = true;
-                return StaticMessageBuilder::withPayload('first')->setHeader('source', 'tenant_a')->build();
+                return MessageBuilder::withPayload('first')->setHeader('source', 'tenant_a')->build();
             }
         };
         $receiver = $this->newReceiver();
@@ -223,7 +224,7 @@ final class ScheduledTenantResolverTest extends TestCase
                     return null;
                 }
                 $emitted = true;
-                return StaticMessageBuilder::withPayload(['source' => 'tenant_a'])->build();
+                return MessageBuilder::withPayload(['source' => 'tenant_a'])->build();
             }
         };
         $receiver = $this->newReceiver();
@@ -268,25 +269,41 @@ final class ScheduledTenantResolverTest extends TestCase
         return EcotoneLite::bootstrapFlowTesting(
             $classes,
             array_merge($services, ['tenant_a_connection' => new FakeConnectionFactory()]),
-            extensionObjects: [
-                PollingMetadata::create('externalEventPoller')->withExecutionAmountLimit(1)->withHandledMessageLimit(1),
-                PollingMetadata::create('external_processing')->withExecutionAmountLimit(1)->withHandledMessageLimit(1),
-                MultiTenantConfiguration::createWithDefaultConnection('tenant', ['tenant_a' => 'tenant_a_connection', 'tenant_b' => 'tenant_a_connection'], 'tenant_a_connection', DbalConnectionFactory::class, ),
-                DbalConfiguration::createWithDefaults()->withTransactionOnCommandBus(false)->withTransactionOnAsynchronousEndpoints(false)->withClearAndFlushObjectManagerOnCommandBus(false)->withDeduplication(false),
+            ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::ASYNCHRONOUS_PACKAGE]))
+                ->withExtensionObjects([
+                    PollingMetadata::create('externalEventPoller')
+                        ->setExecutionAmountLimit(1)
+                        ->setHandledMessageLimit(1),
+                    PollingMetadata::create('external_processing')
+                        ->setExecutionAmountLimit(1)
+                        ->setHandledMessageLimit(1),
+                    MultiTenantConfiguration::createWithDefaultConnection(
+                        'tenant',
+                        ['tenant_a' => 'tenant_a_connection', 'tenant_b' => 'tenant_a_connection'],
+                        'tenant_a_connection',
+                        DbalConnectionFactory::class,
+                    ),
+                    DbalConfiguration::createWithDefaults()
+                        ->withTransactionOnCommandBus(false)
+                        ->withTransactionOnAsynchronousEndpoints(false)
+                        ->withClearAndFlushObjectManagerOnCommandBus(false)
+                        ->withDeduplication(false),
+                ]),
+            enableAsynchronousProcessing: [
                 SimpleMessageChannelBuilder::createQueueChannel('external_processing'),
             ],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE, ],
             licenceKey: LicenceTesting::VALID_LICENCE,
         );
     }
 
     private function pollOnce(FlowTestSupport $ecotone): void
     {
-        $ecotone->run('externalEventPoller', ExecutionPollingMetadata::createWithTestingSetup(handledMessageLimit: 1, executionTimeLimitInMilliseconds: 1000));
+        $ecotone->run('externalEventPoller', ExecutionPollingMetadata::createWithTestingSetup(1, 1));
     }
 
     private function drainProcessing(FlowTestSupport $ecotone): void
     {
-        $ecotone->run('external_processing', ExecutionPollingMetadata::createWithTestingSetup(handledMessageLimit: 1, executionTimeLimitInMilliseconds: 1000));
+        $ecotone->run('external_processing', ExecutionPollingMetadata::createWithTestingSetup(1, 1));
     }
 }

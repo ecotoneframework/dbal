@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Test\Ecotone\Dbal\Fixture;
 
 use Doctrine\DBAL\Connection;
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Api\Interceptor\MethodInvocation;
-use Ecotone\Api\Messaging\Message;
 use Ecotone\Dbal\EcotoneManagerRegistryConnectionFactory;
-use Ecotone\Enqueue\ConnectionFactory;
+use Ecotone\Messaging\Handler\Processor\MethodInvoker\MethodInvocation;
+use Ecotone\Messaging\Message;
+use Enqueue\Dbal\DbalConnectionFactory;
+use Interop\Queue\ConnectionFactory;
 
 /**
  * An interceptor that can break database connections at specific points in the transaction lifecycle

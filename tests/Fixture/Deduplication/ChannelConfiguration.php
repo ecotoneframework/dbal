@@ -2,10 +2,10 @@
 
 namespace Test\Ecotone\Dbal\Fixture\Deduplication;
 
-use Ecotone\Api\Attribute\ServiceContext;
-use Ecotone\Api\Dbal\ExtensionObject\DbalBackedMessageChannelBuilder;
-use Ecotone\Api\Dbal\ExtensionObject\DbalConfiguration;
-use Ecotone\Api\ExtensionObject\PollingMetadata;
+use Ecotone\Dbal\Configuration\DbalConfiguration;
+use Ecotone\Dbal\DbalBackedMessageChannelBuilder;
+use Ecotone\Messaging\Attribute\ServiceContext;
+use Ecotone\Messaging\Endpoint\PollingMetadata;
 
 /**
  * licence Apache-2.0
@@ -23,9 +23,9 @@ class ChannelConfiguration
             DbalBackedMessageChannelBuilder::create(self::CHANNEL_NAME)
                 ->withReceiveTimeout(1),
             PollingMetadata::create(self::CHANNEL_NAME)
-                ->withHandledMessageLimit(10)
-                ->withExecutionTimeLimitInMilliseconds(1000)
-                ->withStopOnError(true),
+                ->setHandledMessageLimit(10)
+                ->setExecutionTimeLimitInMilliseconds(1000)
+                ->setStopOnError(true),
         ];
     }
 }

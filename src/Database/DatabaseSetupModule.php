@@ -5,35 +5,20 @@ declare(strict_types=1);
 namespace Ecotone\Dbal\Database;
 
 use Ecotone\AnnotationFinder\AnnotationFinder;
-use Ecotone\Api\Attribute\ConsoleCommand;
-use Ecotone\Api\Attribute\ModuleAnnotation;
-use Ecotone\Api\Attribute\WithoutDatabaseTransaction;
-use Ecotone\Api\Dbal\ExtensionObject\DatabaseSetupManager;
-use Ecotone\Api\Dbal\ExtensionObject\DatabaseSetupManagerRegistry;
-use Ecotone\Api\Dbal\ExtensionObject\DbalConfiguration;
-use Ecotone\Api\Dbal\ExtensionObject\DbalConnectionReference;
-use Ecotone\Api\Dbal\ExtensionObject\MultiTenantConfiguration;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\ExtensionObject\ServiceConfiguration;
-use Ecotone\Api\Gateway\EcotoneClockInterface;
-use Ecotone\Api\Messaging\ConfiguredMessagingSystem;
-use Ecotone\Api\Pulse\PulseConfiguration;
-use Ecotone\Dbal\Database\Pulse\PulseSetupStatus;
-use Ecotone\Dbal\Database\Pulse\PulseTenantSetupStatus;
+use Ecotone\Dbal\Configuration\DbalConfiguration;
 use Ecotone\Dbal\DbalReconnectableConnectionFactory;
-use Ecotone\Lite\Test\DatabaseTablesSetUpReference;
+use Ecotone\Messaging\Attribute\ModuleAnnotation;
 use Ecotone\Messaging\Config\Annotation\AnnotationModule;
 use Ecotone\Messaging\Config\Annotation\ModuleConfiguration\ConsoleCommandModule;
 use Ecotone\Messaging\Config\Annotation\ModuleConfiguration\ExtensionObjectResolver;
 use Ecotone\Messaging\Config\Configuration;
-use Ecotone\Messaging\Config\Container\AttributeDefinition;
-use Ecotone\Messaging\Config\Container\Compiler\ContainerImplementation;
 use Ecotone\Messaging\Config\Container\Definition;
 use Ecotone\Messaging\Config\Container\InterfaceToCallReference;
 use Ecotone\Messaging\Config\Container\Reference;
+use Ecotone\Messaging\Config\ModulePackageList;
 use Ecotone\Messaging\Config\ModuleReferenceSearchService;
+use Ecotone\Messaging\Config\ServiceConfiguration;
 use Ecotone\Messaging\Handler\InterfaceToCallRegistry;
-use Ecotone\Modelling\MessageHandling\Distribution\Pulse\PulseSnapshotSectionRegistration;
 
 #[ModuleAnnotation]
 /**
@@ -41,7 +26,7 @@ use Ecotone\Modelling\MessageHandling\Distribution\Pulse\PulseSnapshotSectionReg
  *
  * licence Apache-2.0
  */
-final class DatabaseSetupModule implements AnnotationModule
+class DatabaseSetupModule implements AnnotationModule
 {
     public static function create(AnnotationFinder $annotationRegistrationService, InterfaceToCallRegistry $interfaceToCallRegistry): static
     {
@@ -58,79 +43,34 @@ final class DatabaseSetupModule implements AnnotationModule
 
         $tableManagerReferences = ExtensionObjectResolver::resolve(DbalTableManagerReference::class, $extensionObjects);
 
-        $defaultConnectionReference = $dbalConfiguration->defaultConnectionReferenceNames[0] ?? DbalConnectionReference::DEFAULT;
+        $connectionReference = $dbalConfiguration->getDefaultConnectionReferenceNames()[0] ?? \Enqueue\Dbal\DbalConnectionFactory::class;
 
-        $tableManagerRefsByConnection = [$defaultConnectionReference => []];
-        foreach ($tableManagerReferences as $tableManagerReference) {
-            $tableManagerRefsByConnection[$tableManagerReference->getConnectionReferenceName()][] = new Reference($tableManagerReference->getReferenceName());
-        }
-
-        $managerReferencesByConnection = [];
-        foreach ($tableManagerRefsByConnection as $connectionReferenceName => $tableManagerRefs) {
-            $setupManagerReferenceName = self::setupManagerReferenceName($connectionReferenceName);
-            $managerReferencesByConnection[$connectionReferenceName] = new Reference($setupManagerReferenceName);
-
-            $messagingConfiguration->registerServiceDefinition(
-                $setupManagerReferenceName,
-                new Definition(DatabaseSetupManager::class, [
-                    new Definition(DbalReconnectableConnectionFactory::class, [
-                        new Reference($connectionReferenceName),
-                        new Reference(EcotoneClockInterface::class),
-                    ]),
-                    $tableManagerRefs,
-                ])
-            );
-        }
+        $tableManagerRefs = array_map(
+            fn (DbalTableManagerReference $ref) => new Reference($ref->getReferenceName()),
+            $tableManagerReferences
+        );
 
         $messagingConfiguration->registerServiceDefinition(
             DatabaseSetupManager::class,
-            new Reference(self::setupManagerReferenceName($defaultConnectionReference))
-        );
-
-        $connectionFactories = [];
-        foreach (array_keys($tableManagerRefsByConnection) as $connectionReferenceName) {
-            $connectionFactories[$connectionReferenceName] = new Reference($connectionReferenceName, ContainerImplementation::NULL_ON_INVALID_REFERENCE);
-        }
-        $messagingConfiguration->registerServiceDefinition(
-            DbalDatabaseTablesSetUp::class,
-            new Definition(DbalDatabaseTablesSetUp::class, [$connectionFactories, $tableManagerRefsByConnection, new Reference(EcotoneClockInterface::class)])
-        );
-
-        $messagingConfiguration->registerServiceDefinition(
-            DatabaseSetupManagerRegistry::class,
-            new Definition(DatabaseSetupManagerRegistry::class, [$managerReferencesByConnection])
-        );
-
-        $messagingConfiguration->registerServiceDefinition(
-            PulseSetupStatus::class,
-            new Definition(PulseSetupStatus::class, [
-                new Reference(ConfiguredMessagingSystem::class),
-                array_map(static fn (MultiTenantConfiguration $configuration): string => $configuration->getReferenceName(), ExtensionObjectResolver::resolve(MultiTenantConfiguration::class, $extensionObjects)),
-            ])
-        );
-
-        $messagingConfiguration->registerServiceDefinition(
-            PulseTenantSetupStatus::class,
-            new Definition(PulseTenantSetupStatus::class, [
-                new Reference(ConfiguredMessagingSystem::class),
-                array_values(array_filter(
-                    array_map(static fn (MultiTenantConfiguration $configuration): string => $configuration->getReferenceName(), ExtensionObjectResolver::resolve(MultiTenantConfiguration::class, $extensionObjects)),
-                    static fn (string $connectionReferenceName): bool => isset($managerReferencesByConnection[$connectionReferenceName])
-                )),
+            new Definition(DatabaseSetupManager::class, [
+                new Definition(DbalReconnectableConnectionFactory::class, [
+                    new Reference($connectionReference),
+                ]),
+                $tableManagerRefs,
             ])
         );
 
         $messagingConfiguration->registerServiceDefinition(
             DatabaseSetupCommand::class,
             new Definition(DatabaseSetupCommand::class, [
-                new Reference(DatabaseSetupManagerRegistry::class),
+                new Reference(DatabaseSetupManager::class),
             ])
         );
 
         $messagingConfiguration->registerServiceDefinition(
             DatabaseDeleteCommand::class,
             new Definition(DatabaseDeleteCommand::class, [
-                new Reference(DatabaseSetupManagerRegistry::class),
+                new Reference(DatabaseSetupManager::class),
             ])
         );
 
@@ -153,25 +93,20 @@ final class DatabaseSetupModule implements AnnotationModule
         );
     }
 
+    public function canHandle($extensionObject): bool
+    {
+        return $extensionObject instanceof DbalTableManagerReference
+            || $extensionObject instanceof DbalConfiguration;
+    }
+
     public function getModuleExtensions(ServiceConfiguration $serviceConfiguration, array $serviceExtensions): array
     {
-        $extensions = [new DatabaseTablesSetUpReference(DbalDatabaseTablesSetUp::class)];
-        if (ExtensionObjectResolver::resolve(PulseConfiguration::class, $serviceExtensions) !== []) {
-            $extensions[] = new PulseSnapshotSectionRegistration(sectionName: 'setup', serviceReference: PulseSetupStatus::class, tenantScoped: false);
-            $extensions[] = new PulseSnapshotSectionRegistration(sectionName: 'setup', serviceReference: PulseTenantSetupStatus::class, tenantScoped: true);
-        }
-
-        return $extensions;
+        return [];
     }
 
     public function getModulePackageName(): string
     {
         return ModulePackageList::DBAL_PACKAGE;
-    }
-
-    private static function setupManagerReferenceName(string $connectionReferenceName): string
-    {
-        return DatabaseSetupManager::class . '.' . $connectionReferenceName;
     }
 
     private function registerConsoleCommand(
@@ -190,11 +125,6 @@ final class DatabaseSetupModule implements AnnotationModule
             $interfaceToCallRegistry,
             $description
         );
-
-        $messageHandlerBuilder = $messageHandlerBuilder->withEndpointAnnotations([
-            new AttributeDefinition(ConsoleCommand::class, [$commandName]),
-            new AttributeDefinition(WithoutDatabaseTransaction::class),
-        ]);
 
         $configuration
             ->registerMessageHandler($messageHandlerBuilder)

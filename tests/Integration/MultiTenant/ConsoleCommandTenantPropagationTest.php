@@ -5,17 +5,18 @@ declare(strict_types=1);
 namespace Test\Ecotone\Dbal\Integration\MultiTenant;
 
 use Doctrine\DBAL\Connection;
-use Ecotone\Api\Attribute\CommandHandler;
-use Ecotone\Api\Attribute\ConsoleCommand;
-use Ecotone\Api\Attribute\Reference;
-use Ecotone\Api\Dbal\Attribute\MultiTenantConnection;
-use Ecotone\Api\Dbal\ExtensionObject\DbalConfiguration;
-use Ecotone\Api\Dbal\ExtensionObject\MultiTenantConfiguration;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\Gateway\CommandBus;
-use Ecotone\Api\Lite\Test\FlowTestSupport;
+use Ecotone\Dbal\Attribute\MultiTenantConnection;
+use Ecotone\Dbal\Configuration\DbalConfiguration;
+use Ecotone\Dbal\MultiTenant\MultiTenantConfiguration;
+use Ecotone\Lite\EcotoneLite;
+use Ecotone\Lite\Test\FlowTestSupport;
+use Ecotone\Messaging\Attribute\ConsoleCommand;
+use Ecotone\Messaging\Attribute\Parameter\Reference;
+use Ecotone\Messaging\Config\ModulePackageList;
+use Ecotone\Messaging\Config\ServiceConfiguration;
 use Ecotone\Messaging\Handler\MethodInvocationException;
-use Ecotone\Test\LicenceTesting;
+use Ecotone\Modelling\Attribute\CommandHandler;
+use Ecotone\Modelling\CommandBus;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 
 /**
@@ -113,19 +114,26 @@ final class ConsoleCommandTenantPropagationTest extends DbalMessagingTestCase
     {
         $recorder = $this->newTenantMarkerRecorder();
 
-        return $this->bootstrapFlowTesting(
+        return EcotoneLite::bootstrapFlowTesting(
             [$recorder::class],
             [
                 $recorder,
                 'tenant_a_connection' => $this->connectionForTenantA(),
                 'tenant_b_connection' => $this->connectionForTenantB(),
             ],
-            extensionObjects: [
-                MultiTenantConfiguration::create(tenantHeaderName:'tenant', tenantToConnectionMapping:['tenant_a' => 'tenant_a_connection', 'tenant_b' => 'tenant_b_connection', ], ),
-                DbalConfiguration::createWithDefaults()->withDeduplication(false),
-            ],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
-            licenceKey: LicenceTesting::VALID_LICENCE,
+            ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
+                ->withExtensionObjects([
+                    MultiTenantConfiguration::create(
+                        tenantHeaderName: 'tenant',
+                        tenantToConnectionMapping: [
+                            'tenant_a' => 'tenant_a_connection',
+                            'tenant_b' => 'tenant_b_connection',
+                        ],
+                    ),
+                    DbalConfiguration::createWithDefaults()
+                        ->withDeduplication(false),
+                ]),
         );
     }
 }

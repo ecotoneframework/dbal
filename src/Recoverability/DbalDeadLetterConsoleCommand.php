@@ -2,11 +2,9 @@
 
 namespace Ecotone\Dbal\Recoverability;
 
-use Ecotone\Api\Attribute\ConsoleParameterOption;
-use Ecotone\Api\Console\ConsoleCommandResultSet;
-use Ecotone\Api\Dbal\Gateway\DeadLetterGateway;
-use Ecotone\Api\Messaging\ErrorContext;
-use Ecotone\Api\Messaging\MessageHeaders;
+use Ecotone\Messaging\Config\ConsoleCommandResultSet;
+use Ecotone\Messaging\Handler\Recoverability\ErrorContext;
+use Ecotone\Messaging\MessageHeaders;
 
 /**
  * licence Apache-2.0
@@ -22,8 +20,8 @@ class DbalDeadLetterConsoleCommand
             [
                 [DbalDeadLetterModule::LIST_COMMAND_NAME . ' {page:int}', 'List all dead messages'],
                 [DbalDeadLetterModule::SHOW_COMMAND_NAME . ' {messageId:string} {fullDetails:bool}', 'Show more details about specific message'],
-                [DbalDeadLetterModule::REPLAY_COMMAND_NAME . ' {messageId:string} {--targetChannel=}', 'Replay chosen dead message, to its source channel or to the target channel'],
-                [DbalDeadLetterModule::REPLAY_ALL_COMMAND_NAME . ' {--targetChannel=}', 'Replay ALL dead messages, to their source channels or to the target channel'],
+                [DbalDeadLetterModule::REPLAY_COMMAND_NAME . ' {messageId:string}', 'Replay chosen dead message'],
+                [DbalDeadLetterModule::REPLAY_ALL_COMMAND_NAME, 'Replay ALL dead messages'],
                 [DbalDeadLetterModule::DELETE_COMMAND_NAME . ' {messageId:string}', 'Delete chosen dead message'],
             ]
         );
@@ -39,8 +37,8 @@ class DbalDeadLetterConsoleCommand
             array_map(function (ErrorContext $errorContext) {
                 return [
                     $errorContext->getMessageId(),
-                    $this->convertTimestampToReadableFormat($errorContext->failedTimestamp),
-                    $this->getReadableStacktrace($errorContext->stackTrace, false),
+                    $this->convertTimestampToReadableFormat($errorContext->getFailedTimestamp()),
+                    $this->getReadableStacktrace($errorContext->getStackTrace(), false),
                 ];
             }, $deadLetterGateway->list($limit, $offset))
         );
@@ -66,9 +64,9 @@ class DbalDeadLetterConsoleCommand
         );
     }
 
-    public function replay(DeadLetterGateway $deadLetterGateway, string $messageId, #[ConsoleParameterOption] ?string $targetChannel = null): void
+    public function reply(DeadLetterGateway $deadLetterGateway, string $messageId): void
     {
-        $deadLetterGateway->replay($messageId, $targetChannel);
+        $deadLetterGateway->reply($messageId);
     }
 
     public function delete(DeadLetterGateway $deadLetterGateway, string $messageId): void
@@ -76,9 +74,9 @@ class DbalDeadLetterConsoleCommand
         $deadLetterGateway->delete($messageId);
     }
 
-    public function replayAll(DeadLetterGateway $deadLetterGateway, #[ConsoleParameterOption] ?string $targetChannel = null): void
+    public function replyAll(DeadLetterGateway $deadLetterGateway): void
     {
-        $deadLetterGateway->replayAll($targetChannel);
+        $deadLetterGateway->replyAll();
     }
 
     private function convertTimestampToReadableFormat(int $timestamp)

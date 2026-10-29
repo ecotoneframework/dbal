@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Test\Ecotone\Dbal\Integration;
 
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Api\Dbal\ExtensionObject\DbalConfiguration;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\Lite\Test\FlowTestSupport;
+use Ecotone\Dbal\Configuration\DbalConfiguration;
+use Ecotone\Lite\EcotoneLite;
+use Ecotone\Lite\Test\FlowTestSupport;
+use Ecotone\Messaging\Config\ModulePackageList;
+use Ecotone\Messaging\Config\ServiceConfiguration;
+use Enqueue\Dbal\DbalConnectionFactory;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 use Test\Ecotone\Dbal\Fixture\DocumentStoreAggregate\Person;
 use Test\Ecotone\Dbal\Fixture\DocumentStoreAggregate\PersonJsonConverter;
@@ -36,13 +38,17 @@ final class DocumentStoreAggregateTest extends DbalMessagingTestCase
 
     public function test_explicit_aggregate_config_for_document_store_aggregate(): void
     {
-        $ecotone = $this->bootstrapFlowTesting(
+        $ecotone = EcotoneLite::bootstrapFlowTesting(
             [Person::class, PersonJsonConverter::class],
             containerOrAvailableServices: [new PersonJsonConverter(), DbalConnectionFactory::class => $this->getConnectionFactory()],
-            extensionObjects: [DbalConfiguration::createWithDefaults()->withDocumentStore(enableDocumentStoreStateStoredRepository:true, documentStoreRelatedAggregates:[Person::class])],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE, ],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::ASYNCHRONOUS_PACKAGE]))
+                ->withExtensionObjects([
+                    DbalConfiguration::createWithDefaults()
+                        ->withDocumentStore(enableDocumentStoreStandardRepository: true, documentStoreRelatedAggregates: [Person::class]),
+                ]),
             pathToRootCatalog: __DIR__ . '/../../',
-            addInMemoryStateStoredRepository: true,
+            addInMemoryStateStoredRepository: true
         );
 
         $ecotone->sendCommand(new RegisterPerson(100, 'Johnny'));
@@ -55,12 +61,15 @@ final class DocumentStoreAggregateTest extends DbalMessagingTestCase
 
     private function bootstrapEcotone(): FlowTestSupport
     {
-        return $this->bootstrapFlowTesting(
+        return EcotoneLite::bootstrapFlowTesting(
             containerOrAvailableServices: [new PersonJsonConverter(), DbalConnectionFactory::class => $this->getConnectionFactory()],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE, ],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::ASYNCHRONOUS_PACKAGE]))
+                ->withNamespaces([
+                    'Test\Ecotone\Dbal\Fixture\DocumentStoreAggregate',
+                ]),
             pathToRootCatalog: __DIR__ . '/../../',
-            addInMemoryStateStoredRepository: false,
-            namespaces: ['Test\Ecotone\Dbal\Fixture\DocumentStoreAggregate', ],
+            addInMemoryStateStoredRepository: false
         );
     }
 }

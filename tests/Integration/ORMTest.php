@@ -4,25 +4,21 @@ declare(strict_types=1);
 
 namespace Test\Ecotone\Dbal\Integration;
 
-use Doctrine\Common\EventManager;
-use Doctrine\ORM\EntityManager;
-use Doctrine\ORM\Event\PrePersistEventArgs;
-use Doctrine\ORM\Events;
-use Doctrine\ORM\ORMSetup;
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Api\Dbal\ExtensionObject\DbalBackedMessageChannelBuilder;
-use Ecotone\Api\Dbal\ExtensionObject\DbalConfiguration;
-use Ecotone\Api\Dbal\ExtensionObject\MultiTenantConfiguration;
-use Ecotone\Api\ExtensionObject\ExecutionPollingMetadata;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\Gateway\CommandBus;
-use Ecotone\Api\Lite\Test\FlowTestSupport;
-use Ecotone\Api\Modelling\AggregateNotFoundException;
+use Ecotone\Dbal\Configuration\DbalConfiguration;
+use Ecotone\Dbal\DbalBackedMessageChannelBuilder;
 use Ecotone\Dbal\DbalConnection;
 use Ecotone\Dbal\EcotoneManagerRegistryConnectionFactory;
 use Ecotone\Dbal\ManagerRegistryEmulator;
+use Ecotone\Dbal\MultiTenant\MultiTenantConfiguration;
+use Ecotone\Lite\EcotoneLite;
+use Ecotone\Lite\Test\FlowTestSupport;
+use Ecotone\Messaging\Config\ModulePackageList;
+use Ecotone\Messaging\Config\ServiceConfiguration;
+use Ecotone\Messaging\Endpoint\ExecutionPollingMetadata;
 use Ecotone\Messaging\Support\InvalidArgumentException;
-use Ecotone\Test\LicenceTesting;
+use Ecotone\Modelling\AggregateNotFoundException;
+use Ecotone\Modelling\CommandBus;
+use Enqueue\Dbal\DbalConnectionFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 use Test\Ecotone\Dbal\Fixture\ORM\FailureMode\MultipleInternalCommandsService;
@@ -145,22 +141,29 @@ final class ORMTest extends DbalMessagingTestCase
         $this->setupUserTable($tenantAConnection->getConnection());
         $this->setupUserTable($tenantBConnection->getConnection());
 
-        $ecotone = $this->bootstrapFlowTesting(
+        $ecotone = EcotoneLite::bootstrapFlowTesting(
             containerOrAvailableServices: array_merge([
                 SaveMultipleEntitiesHandler::class => new SaveMultipleEntitiesHandler(),
                 PersonQueryService::class => new PersonQueryService(),
             ], $services),
-            extensionObjects: array_merge([DbalConfiguration::createWithDefaults()->withDoctrineORMRepositories($enableDoctrineORMAggregates), ], [$multiTenantConfiguration]),
-            enabledModules: [ModulePackageList::DBAL_PACKAGE, ],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::ASYNCHRONOUS_PACKAGE]))
+                ->withExtensionObjects(array_merge([
+                    DbalConfiguration::createWithDefaults()
+                        ->withDoctrineORMRepositories($enableDoctrineORMAggregates),
+                ], [$multiTenantConfiguration]))
+                ->withNamespaces(array_merge($namespaces, [
+                    /** This registers second Person with id +1 */
+                    'Test\Ecotone\Dbal\Fixture\ORM\SynchronousEventHandler',
+                    'Test\Ecotone\Dbal\Fixture\ORM\PersonQueryHandler',
+                ])),
             pathToRootCatalog: __DIR__ . '/../../',
             addInMemoryStateStoredRepository: false,
-            licenceKey: LicenceTesting::VALID_LICENCE,
-            namespaces: array_merge($namespaces, ['Test\Ecotone\Dbal\Fixture\ORM\SynchronousEventHandler', 'Test\Ecotone\Dbal\Fixture\ORM\PersonQueryHandler', ]),
         );
 
         /** For Tenant A */
         $ecotone->sendCommand(new RegisterPerson(100, 'Johnny'), metadata: ['tenant' => 'tenant_a']);
-        $ecotone->sendCommandWithRouting(Person::RENAME_COMMAND, 'Paul', metadata: ['aggregate.id' => 100, 'tenant' => 'tenant_a']);
+        $ecotone->sendCommandWithRoutingKey(Person::RENAME_COMMAND, 'Paul', metadata: ['aggregate.id' => 100, 'tenant' => 'tenant_a']);
 
         self::assertEquals(
             'Paul',
@@ -183,7 +186,7 @@ final class ORMTest extends DbalMessagingTestCase
 
         /** For Tenant B */
         $ecotone->sendCommand(new RegisterPerson(1, 'Johnny'), metadata: ['tenant' => 'tenant_b']);
-        $ecotone->sendCommandWithRouting(Person::RENAME_COMMAND, 'Paul', metadata: ['aggregate.id' => 1, 'tenant' => 'tenant_b']);
+        $ecotone->sendCommandWithRoutingKey(Person::RENAME_COMMAND, 'Paul', metadata: ['aggregate.id' => 1, 'tenant' => 'tenant_b']);
 
         self::assertEquals(
             'Paul',
@@ -212,21 +215,28 @@ final class ORMTest extends DbalMessagingTestCase
         $connectionFactory = $services[DbalConnectionFactory::class];
         $this->setupUserTable($connectionFactory->getConnection());
 
-        $ecotone = $this->bootstrapFlowTesting(
+        $ecotone = EcotoneLite::bootstrapFlowTesting(
             containerOrAvailableServices: array_merge([
                 SaveMultipleEntitiesHandler::class => new SaveMultipleEntitiesHandler(),
                 PersonQueryService::class => new PersonQueryService(),
             ], $services),
-            extensionObjects: [DbalConfiguration::createWithDefaults()->withDoctrineORMRepositories($enableDoctrineORMAggregates)],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE, ],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::ASYNCHRONOUS_PACKAGE]))
+                ->withExtensionObjects([
+                    DbalConfiguration::createWithDefaults()
+                        ->withDoctrineORMRepositories($enableDoctrineORMAggregates),
+                ])
+                ->withNamespaces(array_merge($namespaces, [
+                    /** This registers second Person with id +1 */
+                    'Test\Ecotone\Dbal\Fixture\ORM\SynchronousEventHandler',
+                    'Test\Ecotone\Dbal\Fixture\ORM\PersonQueryHandler',
+                ])),
             pathToRootCatalog: __DIR__ . '/../../',
             addInMemoryStateStoredRepository: false,
-            licenceKey: LicenceTesting::VALID_LICENCE,
-            namespaces: array_merge($namespaces, ['Test\Ecotone\Dbal\Fixture\ORM\SynchronousEventHandler', 'Test\Ecotone\Dbal\Fixture\ORM\PersonQueryHandler', ]),
         );
 
         $ecotone->sendCommand(new RegisterPerson(100, 'Johnny'));
-        $ecotone->sendCommandWithRouting(Person::RENAME_COMMAND, 'Paul', metadata: ['aggregate.id' => 100]);
+        $ecotone->sendCommandWithRoutingKey(Person::RENAME_COMMAND, 'Paul', metadata: ['aggregate.id' => 100]);
 
         self::assertEquals(
             'Paul',
@@ -250,14 +260,19 @@ final class ORMTest extends DbalMessagingTestCase
         $this->setupUserTable($connectionFactory->getConnection());
         $entityManager = $connectionFactory->getRegistry()->getManager();
 
-        $ecotone = $this->bootstrapFlowTesting(
+        $ecotone = EcotoneLite::bootstrapFlowTesting(
             containerOrAvailableServices: $services,
-            extensionObjects: [DbalConfiguration::createWithDefaults()->withDoctrineORMRepositories($enableDoctrineORMAggregates)->withClearAndFlushObjectManagerOnCommandBus(false)->withFlushWhenPersisting(false)],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE, ],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::ASYNCHRONOUS_PACKAGE]))
+                ->withNamespaces($namespaces)
+                ->withExtensionObjects([
+                    DbalConfiguration::createWithDefaults()
+                        ->withDoctrineORMRepositories($enableDoctrineORMAggregates)
+                        ->withClearAndFlushObjectManagerOnCommandBus(false)
+                        ->withFlushWhenPersisting(false),
+                ]),
             pathToRootCatalog: __DIR__ . '/../../',
-            addInMemoryStateStoredRepository: false,
-            licenceKey: LicenceTesting::VALID_LICENCE,
-            namespaces: $namespaces,
+            addInMemoryStateStoredRepository: false
         );
 
         $ecotone->sendCommand(new RegisterPerson(100, 'Johnny'));
@@ -276,14 +291,17 @@ final class ORMTest extends DbalMessagingTestCase
         $this->setupUserTable($connectionFactory->getConnection());
         $entityManager = $connectionFactory->getRegistry()->getManager();
 
-        $ecotone = $this->bootstrapFlowTesting(
+        $ecotone = EcotoneLite::bootstrapFlowTesting(
             containerOrAvailableServices: $services,
-            extensionObjects: [DbalConfiguration::createWithDefaults()->withDoctrineORMRepositories($enableDoctrineORMAggregates)],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE, ],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::ASYNCHRONOUS_PACKAGE]))
+                ->withExtensionObjects([
+                    DbalConfiguration::createWithDefaults()
+                        ->withDoctrineORMRepositories($enableDoctrineORMAggregates),
+                ])
+                ->withNamespaces($namespaces),
             pathToRootCatalog: __DIR__ . '/../../',
-            addInMemoryStateStoredRepository: false,
-            licenceKey: LicenceTesting::VALID_LICENCE,
-            namespaces: $namespaces,
+            addInMemoryStateStoredRepository: false
         );
 
         $entityManager->close();
@@ -294,75 +312,43 @@ final class ORMTest extends DbalMessagingTestCase
         );
     }
 
-    public function test_an_entity_manager_handed_to_the_registry_keeps_its_event_listeners_after_it_is_reset(): void
-    {
-        $this->setupUserTable();
-        $persistListener = new class () {
-            public array $persistedNames = [];
-
-            public function prePersist(PrePersistEventArgs $event): void
-            {
-                $this->persistedNames[] = $event->getObject()->getName();
-            }
-        };
-        $eventManager = new EventManager();
-        $eventManager->addEventListener([Events::prePersist], $persistListener);
-        $ormConfiguration = ORMSetup::createAttributeMetadataConfiguration([__DIR__ . '/../Fixture/ORM/Person'], true);
-        if (PHP_VERSION_ID >= 80400 && method_exists($ormConfiguration, 'enableNativeLazyObjects')) {
-            $ormConfiguration->enableNativeLazyObjects(true);
-        }
-        $entityManager = new EntityManager($this->getConnection(), $ormConfiguration, $eventManager);
-
-        $ecotone = $this->bootstrapFlowTesting(
-            containerOrAvailableServices: [DbalConnectionFactory::class => ManagerRegistryEmulator::createEntityManager($entityManager)],
-            extensionObjects: [DbalConfiguration::createWithDefaults()->withDoctrineORMRepositories(true, [Person::class])],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
-            pathToRootCatalog: __DIR__ . '/../../',
-            addInMemoryStateStoredRepository: false,
-            licenceKey: LicenceTesting::VALID_LICENCE,
-            namespaces: ['Test\Ecotone\Dbal\Fixture\ORM\Person'],
-        );
-
-        $entityManager->close();
-        $ecotone->sendCommand(new RegisterPerson(100, 'Johnny'));
-
-        self::assertSame('Johnny', $ecotone->sendQueryWithRouting('person.getName', metadata: ['aggregate.id' => 100]));
-        self::assertSame(['Johnny'], $persistListener->persistedNames);
-    }
-
     public function test_throwing_exception_when_setting_up_doctrine_orm_using_non_orm_registry_based_connection()
     {
-        $ecotoneLite = $this->bootstrapFlowTesting(
+        $ecotoneLite = EcotoneLite::bootstrapFlowTesting(
             [Person::class, MultipleInternalCommandsService::class],
             [new MultipleInternalCommandsService(), DbalConnectionFactory::class => DbalConnection::create($this->getConnection())],
-            extensionObjects: [
-                DbalConfiguration::createWithDefaults()->withDoctrineORMRepositories(true),
-                DbalBackedMessageChannelBuilder::create('async'),
-            ],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
-            addInMemoryStateStoredRepository: false,
-            licenceKey: LicenceTesting::VALID_LICENCE,
+            ServiceConfiguration::createWithDefaults()
+                ->withExtensionObjects([
+                    DbalConfiguration::createWithDefaults()
+                        ->withDoctrineORMRepositories(true),
+                    DbalBackedMessageChannelBuilder::create('async'),
+                ])
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::ASYNCHRONOUS_PACKAGE, ModulePackageList::DBAL_PACKAGE])),
+            addInMemoryStateStoredRepository: false
         );
 
         $this->expectException(InvalidArgumentException::class);
 
-        $ecotoneLite->sendCommandWithRouting('multipleInternalCommands', [['personId' => 99, 'personName' => 'Johny', 'exception' => false]]);
-        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(handledMessageLimit: 2, executionTimeLimitInMilliseconds: 5000, stopOnError: true));
+        $ecotoneLite->sendCommandWithRoutingKey('multipleInternalCommands', [['personId' => 99, 'personName' => 'Johny', 'exception' => false]]);
+        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(amountOfMessagesToHandle: 2, maxExecutionTimeInMilliseconds: 5000, failAtError: true));
     }
 
     private function bootstrapEcotone(array $namespaces = ['Test\Ecotone\Dbal\Fixture\ORM\Person']): FlowTestSupport
     {
         $this->setupUserTable();
 
-        return $this->bootstrapFlowTesting(
+        return EcotoneLite::bootstrapFlowTesting(
             containerOrAvailableServices: [DbalConnectionFactory::class => $this->getORMConnectionFactory([__DIR__.'/../Fixture/ORM/Person'])],
-            extensionObjects: [DbalConfiguration::createWithDefaults()->withDoctrineORMRepositories(true, [Person::class])],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE, ],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withEnvironment('prod')
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::ASYNCHRONOUS_PACKAGE]))
+                ->withNamespaces($namespaces)
+                ->withExtensionObjects([
+                    DbalConfiguration::createWithDefaults()
+                        ->withDoctrineORMRepositories(true, [Person::class]),
+                ]),
             pathToRootCatalog: __DIR__ . '/../../',
-            addInMemoryStateStoredRepository: false,
-            licenceKey: LicenceTesting::VALID_LICENCE,
-            namespaces: $namespaces,
-            environment: 'prod',
+            addInMemoryStateStoredRepository: false
         );
     }
 

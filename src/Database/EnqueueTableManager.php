@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace Ecotone\Dbal\Database;
 
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\Exception\TableExistsException;
 use Doctrine\DBAL\Schema\Table;
-use Ecotone\Api\Dbal\ExtensionObject\DbalConnectionReference;
+use Ecotone\Dbal\Compatibility\SchemaManagerCompatibility;
 use Ecotone\Messaging\Config\Container\Definition;
 
 /**
@@ -21,14 +20,8 @@ final class EnqueueTableManager implements DbalTableManager
     public function __construct(
         private string $tableName,
         private bool $isUsed,
-        private ?string $consoleInvocationPrefix = null,
-        private string $connectionReferenceName = DbalConnectionReference::DEFAULT,
+        private bool $shouldAutoInitialize,
     ) {
-    }
-
-    public static function referenceFor(string $connectionReferenceName): string
-    {
-        return $connectionReferenceName === DbalConnectionReference::DEFAULT ? self::class : self::class . '.' . $connectionReferenceName;
     }
 
     public function getFeatureName(): string
@@ -48,12 +41,12 @@ final class EnqueueTableManager implements DbalTableManager
 
     public function getDefinition(): Definition
     {
-        return new Definition(self::class, [$this->tableName, $this->isUsed, $this->consoleInvocationPrefix, $this->connectionReferenceName]);
+        return new Definition(self::class, [$this->tableName, $this->isUsed, $this->shouldAutoInitialize]);
     }
 
-    public function getMissingTableInstructions(): string
+    public function shouldBeInitializedAutomatically(): bool
     {
-        return MissingTableInstructions::build(self::FEATURE_NAME, $this->tableName, $this->consoleInvocationPrefix, $this->connectionReferenceName);
+        return $this->shouldAutoInitialize;
     }
 
     public function createTable(Connection $connection): void
@@ -62,10 +55,7 @@ final class EnqueueTableManager implements DbalTableManager
             return;
         }
 
-        try {
-            $connection->createSchemaManager()->createTable($this->buildTableSchema());
-        } catch (TableExistsException) {
-        }
+        SchemaManagerCompatibility::getSchemaManager($connection)->createTable($this->buildTableSchema());
     }
 
     public function dropTable(Connection $connection): void
@@ -75,7 +65,7 @@ final class EnqueueTableManager implements DbalTableManager
 
     public function getCreateTableSql(Connection $connection): array
     {
-        return DbalIdempotentDdl::withIfNotExistsAll($connection->getDatabasePlatform()->getCreateTableSQL($this->buildTableSchema()));
+        return $connection->getDatabasePlatform()->getCreateTableSQL($this->buildTableSchema());
     }
 
     private function buildTableSchema(): Table
@@ -111,6 +101,6 @@ final class EnqueueTableManager implements DbalTableManager
 
     public function isInitialized(Connection $connection): bool
     {
-        return $connection->createSchemaManager()->tableExists($this->tableName);
+        return SchemaManagerCompatibility::tableExists($connection, $this->tableName);
     }
 }

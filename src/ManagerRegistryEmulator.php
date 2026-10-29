@@ -12,22 +12,21 @@ use Doctrine\ORM\Tools\Setup;
 use Doctrine\Persistence\ManagerRegistry;
 use Doctrine\Persistence\ObjectManager;
 use Doctrine\Persistence\ObjectRepository;
-use Ecotone\Api\Dbal\DbalConnectionFactory;
 use Ecotone\Messaging\Support\InvalidArgumentException;
+use Enqueue\Dbal\DbalConnectionFactory;
 
 /**
  * licence Apache-2.0
  */
 final class ManagerRegistryEmulator implements ManagerRegistry
 {
-    private ?EntityManager $entityManager = null;
-
     /**
      * @param string[] $pathsToMapping
      */
     public function __construct(
         private Connection $connection,
         private array $pathsToMapping = [],
+        private ?EntityManagerInterface $entityManager = null
     ) {
     }
 
@@ -51,9 +50,9 @@ final class ManagerRegistryEmulator implements ManagerRegistry
         return new EcotoneManagerRegistryConnectionFactory(new self($connection, $pathsToMapping));
     }
 
-    public static function createEntityManager(EntityManagerInterface $entityManager): EcotoneManagerRegistryConnectionFactory
+    public static function createEntityManager(EntityManagerInterface $entityManager, array $pathsToMapping = []): EcotoneManagerRegistryConnectionFactory
     {
-        return new EcotoneManagerRegistryConnectionFactory(new EntityManagerRegistryEmulator($entityManager));
+        return new EcotoneManagerRegistryConnectionFactory(new self($entityManager->getConnection(), $pathsToMapping, $entityManager));
     }
 
     public static function createForManagerRegistry(ManagerRegistry $managerRegistry, string $connectionName): EcotoneManagerRegistryConnectionFactory

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Test\Ecotone\Dbal\Integration\Consumer;
 
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Api\Dbal\ExtensionObject\DbalBackedMessageChannelBuilder;
-use Ecotone\Api\ExtensionObject\ExecutionPollingMetadata;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
+use Ecotone\Dbal\DbalBackedMessageChannelBuilder;
+use Ecotone\Lite\EcotoneLite;
+use Ecotone\Messaging\Config\ModulePackageList;
+use Ecotone\Messaging\Config\ServiceConfiguration;
+use Ecotone\Messaging\Endpoint\ExecutionPollingMetadata;
+use Enqueue\Dbal\DbalConnectionFactory;
 use Symfony\Component\Uid\Uuid;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 
@@ -31,20 +33,23 @@ final class GracefulShutdownOnSignalTest extends DbalMessagingTestCase
 
         $channelName = Uuid::v7()->toRfc4122();
 
-        $ecotoneLite = $this->bootstrapFlowTesting(
-            containerOrAvailableServices: [
-                DbalConnectionFactory::class => $this->getConnectionFactory(),
-            ],
-            extensionObjects: [DbalBackedMessageChannelBuilder::create($channelName)->withReceiveTimeout(200)],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
-        );
-
         // Spawn an independent OS process (not a fork) to deliver the signal - forking
         // this PHP process would duplicate the already-open DB connection's socket fd
         // (opened in DbalMessagingTestCase::setUp()) into the child and corrupt it.
-        // The signal is scheduled after bootstrap, so it cannot reach the process before
-        // run() has installed the consumer's handler and terminate PHPUnit instead.
-        exec(sprintf('(sleep 1 && kill -TERM %d) > /dev/null 2>&1 &', posix_getpid()));
+        $parentPid = posix_getpid();
+        exec(sprintf('(sleep 1 && kill -TERM %d) > /dev/null 2>&1 &', $parentPid));
+
+        $ecotoneLite = EcotoneLite::bootstrapFlowTesting(
+            containerOrAvailableServices: [
+                DbalConnectionFactory::class => $this->getConnectionFactory(),
+            ],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
+                ->withExtensionObjects([
+                    DbalBackedMessageChannelBuilder::create($channelName)
+                        ->withReceiveTimeout(200),
+                ])
+        );
 
         $startedAt = microtime(true);
 

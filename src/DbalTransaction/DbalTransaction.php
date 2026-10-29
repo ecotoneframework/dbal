@@ -3,7 +3,7 @@
 namespace Ecotone\Dbal\DbalTransaction;
 
 use Attribute;
-use Ecotone\Api\Dbal\ExtensionObject\DbalConnectionReference;
+use Enqueue\Dbal\DbalConnectionFactory;
 
 #[Attribute]
 /**
@@ -11,5 +11,5 @@ use Ecotone\Api\Dbal\ExtensionObject\DbalConnectionReference;
  */
 class DbalTransaction
 {
-    public $connectionReferenceNames = [DbalConnectionReference::DEFAULT];
+    public $connectionReferenceNames = [DbalConnectionFactory::class];
 }

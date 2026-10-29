@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Test\Ecotone\Dbal\Integration\Deduplication;
 
-use Ecotone\Api\Attribute\CommandHandler;
-use Ecotone\Api\Attribute\Deduplicated;
-use Ecotone\Api\Attribute\QueryHandler;
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\Messaging\MessageHeaders;
+use Ecotone\Lite\EcotoneLite;
+use Ecotone\Messaging\Attribute\Deduplicated;
+use Ecotone\Messaging\Config\ModulePackageList;
+use Ecotone\Messaging\Config\ServiceConfiguration;
+use Ecotone\Messaging\MessageHeaders;
+use Ecotone\Modelling\Attribute\CommandHandler;
+use Ecotone\Modelling\Attribute\QueryHandler;
+use Enqueue\Dbal\DbalConnectionFactory;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 
 /**
@@ -47,16 +49,17 @@ class DbalDeduplicationInterceptorTest extends DbalMessagingTestCase
             }
         };
 
-        $ecotoneLite = $this->bootstrapFlowTesting(
+        $ecotoneLite = EcotoneLite::bootstrapFlowTesting(
             classesToResolve: [get_class($handler)],
             containerOrAvailableServices: [$handler, DbalConnectionFactory::class => $this->getConnectionFactory(true)],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
         );
 
         $messageId = '1';
         $ecotoneLite
-            ->sendCommandWithRouting('endpoint1', metadata: [MessageHeaders::MESSAGE_ID => $messageId])
-            ->sendCommandWithRouting('endpoint2', metadata: [MessageHeaders::MESSAGE_ID => $messageId]);
+            ->sendCommandWithRoutingKey('endpoint1', metadata: [MessageHeaders::MESSAGE_ID => $messageId])
+            ->sendCommandWithRoutingKey('endpoint2', metadata: [MessageHeaders::MESSAGE_ID => $messageId]);
 
         $this->assertEquals(2, $ecotoneLite->sendQueryWithRouting('getCallCount'));
     }
@@ -80,16 +83,17 @@ class DbalDeduplicationInterceptorTest extends DbalMessagingTestCase
             }
         };
 
-        $ecotoneLite = $this->bootstrapFlowTesting(
+        $ecotoneLite = EcotoneLite::bootstrapFlowTesting(
             classesToResolve: [get_class($handler)],
             containerOrAvailableServices: [$handler, DbalConnectionFactory::class => $this->getConnectionFactory(true)],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
         );
 
         $messageId = '1';
         $ecotoneLite
-            ->sendCommandWithRouting('endpoint1', metadata: [MessageHeaders::MESSAGE_ID => $messageId])
-            ->sendCommandWithRouting('endpoint1', metadata: [MessageHeaders::MESSAGE_ID => $messageId]);
+            ->sendCommandWithRoutingKey('endpoint1', metadata: [MessageHeaders::MESSAGE_ID => $messageId])
+            ->sendCommandWithRoutingKey('endpoint1', metadata: [MessageHeaders::MESSAGE_ID => $messageId]);
 
         $this->assertEquals(1, $ecotoneLite->sendQueryWithRouting('getCallCount'));
     }
@@ -113,22 +117,23 @@ class DbalDeduplicationInterceptorTest extends DbalMessagingTestCase
             }
         };
 
-        $ecotoneLite = $this->bootstrapFlowTesting(
+        $ecotoneLite = EcotoneLite::bootstrapFlowTesting(
             classesToResolve: [get_class($handler)],
             containerOrAvailableServices: [$handler, DbalConnectionFactory::class => $this->getConnectionFactory(true)],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
         );
 
         // First call with orderId header
-        $ecotoneLite->sendCommandWithRouting('endpoint1', 'test', metadata: ['orderId' => 'order-123']);
+        $ecotoneLite->sendCommandWithRoutingKey('endpoint1', 'test', metadata: ['orderId' => 'order-123']);
         $this->assertEquals(1, $ecotoneLite->sendQueryWithRouting('getCallCount'));
 
         // Second call with same orderId header (should be deduplicated)
-        $ecotoneLite->sendCommandWithRouting('endpoint1', 'test', metadata: ['orderId' => 'order-123']);
+        $ecotoneLite->sendCommandWithRoutingKey('endpoint1', 'test', metadata: ['orderId' => 'order-123']);
         $this->assertEquals(1, $ecotoneLite->sendQueryWithRouting('getCallCount'));
 
         // Third call with different orderId header (should be processed)
-        $ecotoneLite->sendCommandWithRouting('endpoint1', 'test', metadata: ['orderId' => 'order-456']);
+        $ecotoneLite->sendCommandWithRoutingKey('endpoint1', 'test', metadata: ['orderId' => 'order-456']);
         $this->assertEquals(2, $ecotoneLite->sendQueryWithRouting('getCallCount'));
     }
 
@@ -151,22 +156,23 @@ class DbalDeduplicationInterceptorTest extends DbalMessagingTestCase
             }
         };
 
-        $ecotoneLite = $this->bootstrapFlowTesting(
+        $ecotoneLite = EcotoneLite::bootstrapFlowTesting(
             classesToResolve: [get_class($handler)],
             containerOrAvailableServices: [$handler, DbalConnectionFactory::class => $this->getConnectionFactory(true)],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
         );
 
         // First call with specific payload
-        $ecotoneLite->sendCommandWithRouting('endpoint1', 'unique-payload-1');
+        $ecotoneLite->sendCommandWithRoutingKey('endpoint1', 'unique-payload-1');
         $this->assertEquals(1, $ecotoneLite->sendQueryWithRouting('getCallCount'));
 
         // Second call with same payload (should be deduplicated)
-        $ecotoneLite->sendCommandWithRouting('endpoint1', 'unique-payload-1');
+        $ecotoneLite->sendCommandWithRoutingKey('endpoint1', 'unique-payload-1');
         $this->assertEquals(1, $ecotoneLite->sendQueryWithRouting('getCallCount'));
 
         // Third call with different payload (should be processed)
-        $ecotoneLite->sendCommandWithRouting('endpoint1', 'unique-payload-2');
+        $ecotoneLite->sendCommandWithRoutingKey('endpoint1', 'unique-payload-2');
         $this->assertEquals(2, $ecotoneLite->sendQueryWithRouting('getCallCount'));
     }
 
@@ -189,22 +195,23 @@ class DbalDeduplicationInterceptorTest extends DbalMessagingTestCase
             }
         };
 
-        $ecotoneLite = $this->bootstrapFlowTesting(
+        $ecotoneLite = EcotoneLite::bootstrapFlowTesting(
             classesToResolve: [get_class($handler)],
             containerOrAvailableServices: [$handler, DbalConnectionFactory::class => $this->getConnectionFactory(true)],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
         );
 
         // First call
-        $ecotoneLite->sendCommandWithRouting('endpoint1', 'order-data', metadata: ['customerId' => 'customer-123']);
+        $ecotoneLite->sendCommandWithRoutingKey('endpoint1', 'order-data', metadata: ['customerId' => 'customer-123']);
         $this->assertEquals(1, $ecotoneLite->sendQueryWithRouting('getCallCount'));
 
         // Second call with same combination (should be deduplicated)
-        $ecotoneLite->sendCommandWithRouting('endpoint1', 'order-data', metadata: ['customerId' => 'customer-123']);
+        $ecotoneLite->sendCommandWithRoutingKey('endpoint1', 'order-data', metadata: ['customerId' => 'customer-123']);
         $this->assertEquals(1, $ecotoneLite->sendQueryWithRouting('getCallCount'));
 
         // Third call with different customer but same payload (should be processed)
-        $ecotoneLite->sendCommandWithRouting('endpoint1', 'order-data', metadata: ['customerId' => 'customer-456']);
+        $ecotoneLite->sendCommandWithRoutingKey('endpoint1', 'order-data', metadata: ['customerId' => 'customer-456']);
         $this->assertEquals(2, $ecotoneLite->sendQueryWithRouting('getCallCount'));
     }
 
@@ -241,24 +248,25 @@ class DbalDeduplicationInterceptorTest extends DbalMessagingTestCase
             }
         };
 
-        $ecotoneLite = $this->bootstrapFlowTesting(
+        $ecotoneLite = EcotoneLite::bootstrapFlowTesting(
             classesToResolve: [get_class($handler)],
             containerOrAvailableServices: [$handler, DbalConnectionFactory::class => $this->getConnectionFactory(true)],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
         );
 
         // First call with tracking_one
-        $ecotoneLite->sendCommandWithRouting('endpoint1', 'test', metadata: ['orderId' => 'order-123']);
+        $ecotoneLite->sendCommandWithRoutingKey('endpoint1', 'test', metadata: ['orderId' => 'order-123']);
         $this->assertEquals(1, $ecotoneLite->sendQueryWithRouting('getTrackingOneCallCount'));
         $this->assertEquals(0, $ecotoneLite->sendQueryWithRouting('getTrackingTwoCallCount'));
 
         // Second call with same orderId but different tracking name (should be processed)
-        $ecotoneLite->sendCommandWithRouting('endpoint2', 'test', metadata: ['orderId' => 'order-123']);
+        $ecotoneLite->sendCommandWithRoutingKey('endpoint2', 'test', metadata: ['orderId' => 'order-123']);
         $this->assertEquals(1, $ecotoneLite->sendQueryWithRouting('getTrackingOneCallCount'));
         $this->assertEquals(1, $ecotoneLite->sendQueryWithRouting('getTrackingTwoCallCount'));
 
         // Third call with same orderId and same tracking name as first (should be deduplicated)
-        $ecotoneLite->sendCommandWithRouting('endpoint1', 'test', metadata: ['orderId' => 'order-123']);
+        $ecotoneLite->sendCommandWithRoutingKey('endpoint1', 'test', metadata: ['orderId' => 'order-123']);
         $this->assertEquals(1, $ecotoneLite->sendQueryWithRouting('getTrackingOneCallCount'));
         $this->assertEquals(1, $ecotoneLite->sendQueryWithRouting('getTrackingTwoCallCount'));
     }
@@ -289,18 +297,19 @@ class DbalDeduplicationInterceptorTest extends DbalMessagingTestCase
             }
         };
 
-        $ecotoneLite = $this->bootstrapFlowTesting(
+        $ecotoneLite = EcotoneLite::bootstrapFlowTesting(
             classesToResolve: [get_class($handler)],
             containerOrAvailableServices: [$handler, DbalConnectionFactory::class => $this->getConnectionFactory(true)],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
         );
 
         // First call with custom tracking name
-        $ecotoneLite->sendCommandWithRouting('endpoint1', 'test', metadata: ['orderId' => 'order-123']);
+        $ecotoneLite->sendCommandWithRoutingKey('endpoint1', 'test', metadata: ['orderId' => 'order-123']);
         $this->assertEquals(1, $ecotoneLite->sendQueryWithRouting('getCallCount'));
 
         // Second call with same orderId and different endpoint but same tracking name (should be deduplicated)
-        $ecotoneLite->sendCommandWithRouting('endpoint2', 'test', metadata: ['orderId' => 'order-123']);
+        $ecotoneLite->sendCommandWithRoutingKey('endpoint2', 'test', metadata: ['orderId' => 'order-123']);
         $this->assertEquals(2, $ecotoneLite->sendQueryWithRouting('getCallCount'));
     }
 }

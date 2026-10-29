@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Test\Ecotone\Dbal\Fixture\ClosureInAttribute;
 
-use Ecotone\Api\Dbal\Attribute\WithTenantResolver;
-use Ecotone\Api\Attribute\Header;
-use Ecotone\Api\Attribute\Scheduled;
-use Ecotone\Api\Messaging\Message;
-use Ecotone\Test\StaticMessageBuilder;
+use Ecotone\Dbal\Attribute\WithTenantResolver;
+use Ecotone\Messaging\Attribute\Parameter\Header;
+use Ecotone\Messaging\Attribute\Scheduled;
+use Ecotone\Messaging\Message;
+use Ecotone\Messaging\Support\MessageBuilder;
 
 /**
  * licence Apache-2.0
@@ -31,7 +31,7 @@ final class TenantClosurePoller
 
         $event = array_shift($this->pending);
 
-        return StaticMessageBuilder::withPayload($event['payload'])
+        return MessageBuilder::withPayload($event['payload'])
             ->setHeader('source', $event['source'])
             ->build();
     }

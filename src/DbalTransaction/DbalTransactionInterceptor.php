@@ -4,23 +4,19 @@ namespace Ecotone\Dbal\DbalTransaction;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\ConnectionException;
-use Ecotone\Api\Attribute\WithoutDatabaseTransaction;
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Api\Dbal\ManagerRegistryConnectionFactory;
-use Ecotone\Api\ExtensionObject\PollingMetadata;
-use Ecotone\Api\ExtensionObject\RetryTemplateBuilder;
-use Ecotone\Api\Gateway\EcotoneClockInterface;
-use Ecotone\Api\Interceptor\MethodInvocation;
-use Ecotone\Api\Messaging\Message;
-use Ecotone\Dbal\Connection\DbalContext;
 use Ecotone\Dbal\DbalReconnectableConnectionFactory;
-use Ecotone\Dbal\MultiTenant\MultiTenantConnectionFactory;
-use Ecotone\Dbal\MultiTenant\Pulse\PulseSnapshotRequest;
 use Ecotone\Enqueue\CachedConnectionFactory;
+use Ecotone\Messaging\Attribute\WithoutDatabaseTransaction;
+use Ecotone\Messaging\Endpoint\PollingMetadata;
 use Ecotone\Messaging\Handler\Logger\LoggingGateway;
+use Ecotone\Messaging\Handler\Processor\MethodInvoker\MethodInvocation;
 use Ecotone\Messaging\Handler\Recoverability\RetryRunner;
+use Ecotone\Messaging\Handler\Recoverability\RetryTemplateBuilder;
+use Ecotone\Messaging\Message;
 use Ecotone\Modelling\Config\DatabaseTransaction\TransactionStatusTracker;
-use Ecotone\Modelling\Config\MessageBusChannel;
+use Enqueue\Dbal\DbalConnectionFactory;
+use Enqueue\Dbal\DbalContext;
+use Enqueue\Dbal\ManagerRegistryConnectionFactory;
 use Exception;
 use Interop\Queue\ConnectionFactory;
 use Throwable;
@@ -38,16 +34,14 @@ class DbalTransactionInterceptor
     /**
      * @param array<string, DbalConnectionFactory|ManagerRegistryConnectionFactory> $connectionFactories
      * @param string[] $disableTransactionOnAsynchronousEndpoints
-     * @param string[] $commandRoutingKeysWithoutTransaction
-     * @param string[] $commandClassesWithoutTransaction
      */
-    public function __construct(private array $connectionFactories, private array $disableTransactionOnAsynchronousEndpoints, private RetryRunner $retryRunner, private LoggingGateway $logger, private TransactionStatusTracker $transactionStatusTracker, private EcotoneClockInterface $clock, private array $commandRoutingKeysWithoutTransaction = [], private array $commandClassesWithoutTransaction = [])
+    public function __construct(private array $connectionFactories, private array $disableTransactionOnAsynchronousEndpoints, private RetryRunner $retryRunner, private LoggingGateway $logger, private TransactionStatusTracker $transactionStatusTracker)
     {
     }
 
     public function transactional(MethodInvocation $methodInvocation, Message $message, ?DbalTransaction $DbalTransaction, ?PollingMetadata $pollingMetadata, ?WithoutDatabaseTransaction $withoutDatabaseTransaction = null)
     {
-        if ($withoutDatabaseTransaction !== null || $this->isRoutedToHandlerWithoutTransaction($message)) {
+        if ($withoutDatabaseTransaction !== null) {
             return $methodInvocation->proceed();
         }
 
@@ -61,13 +55,9 @@ class DbalTransactionInterceptor
                 $possibleFactories = $this->connectionFactories;
             }
 
-            if (PulseSnapshotRequest::isIn($message)) {
-                $possibleFactories = array_filter($possibleFactories, static fn (ConnectionFactory $connectionFactory): bool => ! $connectionFactory instanceof MultiTenantConnectionFactory || $connectionFactory->hasActiveTenant());
-            }
-
             /** @var Connection[] $connections */
             $possibleConnections = array_map(function (ConnectionFactory $connectionFactory) {
-                $connectionFactory = CachedConnectionFactory::createFor(new DbalReconnectableConnectionFactory($connectionFactory, $this->clock));
+                $connectionFactory = CachedConnectionFactory::createFor(new DbalReconnectableConnectionFactory($connectionFactory));
 
                 /** @var DbalContext $context */
                 $context = $connectionFactory->createContext();
@@ -85,8 +75,8 @@ class DbalTransactionInterceptor
         }
 
         foreach ($connections as $connection) {
-            $retryStrategy = RetryTemplateBuilder::exponentialBackOffWithMaxDelay(10, 2, 1000)
-                ->maxRetries(2)
+            $retryStrategy = RetryTemplateBuilder::exponentialBackoffWithMaxDelay(10, 2, 1000)
+                ->maxRetryAttempts(2)
                 ->build();
 
             $this->retryRunner->runWithRetry(function () use ($connection) {
@@ -109,8 +99,30 @@ class DbalTransactionInterceptor
             $result = $methodInvocation->proceed();
 
             foreach ($connections as $connection) {
-                $connection->commit();
-                $this->logger->info('Database Transaction committed', $message);
+                try {
+                    $connection->commit();
+                    $this->logger->info('Database Transaction committed', $message);
+                } catch (Exception $exception) {
+                    // Handle the case where a database did an implicit commit or the transaction is no longer active
+                    /** @TODO Ecotone 2.0 remove implicit commit and tables creation on fly, and provide CLI command instead */
+                    if (ImplicitCommit::isImplicitCommitException($exception, $connection)) {
+                        $this->logger->info(
+                            sprintf('Implicit Commit was detected, skipping manual one.'),
+                            $message,
+                            ['exception' => $exception],
+                        );
+
+                        try {
+                            $connection->rollBack();
+                        } catch (Exception) {
+                            // Ignore rollback errors after implicit commit
+                        };
+
+                        continue;
+                    }
+
+                    throw $exception;
+                }
             }
         } catch (Throwable $exception) {
             foreach ($connections as $connection) {
@@ -136,33 +148,5 @@ class DbalTransactionInterceptor
         }
 
         return $result;
-    }
-
-    private function isRoutedToHandlerWithoutTransaction(Message $message): bool
-    {
-        if ($message->getHeaders()->containsKey(MessageBusChannel::COMMAND_CHANNEL_NAME_BY_NAME)) {
-            if ($this->commandRoutingKeysWithoutTransaction === []) {
-                return false;
-            }
-
-            return in_array($message->getHeaders()->get(MessageBusChannel::COMMAND_CHANNEL_NAME_BY_NAME), $this->commandRoutingKeysWithoutTransaction, true);
-        }
-
-        if ($this->commandClassesWithoutTransaction === []) {
-            return false;
-        }
-
-        $payload = $message->getPayload();
-        if (! is_object($payload)) {
-            return false;
-        }
-
-        foreach ($this->commandClassesWithoutTransaction as $commandClass) {
-            if (is_a($payload, $commandClass)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

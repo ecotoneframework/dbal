@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Test\Ecotone\Dbal\Integration;
 
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\Gateway\DocumentStore;
+use Ecotone\Lite\EcotoneLite;
+use Ecotone\Messaging\Config\ModulePackageList;
+use Ecotone\Messaging\Config\ServiceConfiguration;
+use Ecotone\Messaging\Store\Document\DocumentStore;
+use Enqueue\Dbal\DbalConnectionFactory;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 use Test\Ecotone\Dbal\Fixture\DocumentStoreAggregate\PersonJsonConverter;
 
@@ -24,10 +26,10 @@ final class InMemoryDocumentStoreTest extends DbalMessagingTestCase
         $documentStore = $this->bootstrapDocumentStore();
 
         $documentStore->addDocument('shop', '100', $this->convertOrderToJson('milk'));
-        $documentStore->updateDocument('shop', '100', $this->convertOrderToJson('water'), expectedVersion: 1);
+        $documentStore->updateDocument('shop', '100', $this->convertOrderToJson('water'));
         $this->assertOrder($documentStore, 'shop', '100', 'water');
 
-        $documentStore->upsertDocument('shop', '101', $this->convertOrderToJson('coffee'), expectedVersion: 0);
+        $documentStore->upsertDocument('shop', '101', $this->convertOrderToJson('coffee'));
         $this->assertOrder($documentStore, 'shop', '101', 'coffee');
 
         self::assertEquals(2, $documentStore->countDocuments('shop'));
@@ -67,12 +69,15 @@ final class InMemoryDocumentStoreTest extends DbalMessagingTestCase
 
     private function bootstrapDocumentStore(): DocumentStore
     {
-        return ($this->bootstrapFlowTesting(
+        return (EcotoneLite::bootstrapFlowTesting(
             containerOrAvailableServices: [new PersonJsonConverter(), DbalConnectionFactory::class => $this->getConnectionFactory()],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withEnvironment('prod')
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
+                ->withNamespaces([
+                    'Test\Ecotone\Dbal\Fixture\InMemoryDocumentStore',
+                ]),
             pathToRootCatalog: __DIR__ . '/../../',
-            namespaces: ['Test\Ecotone\Dbal\Fixture\InMemoryDocumentStore', ],
-            environment: 'prod',
         ))->getGateway(DocumentStore::class)
         ;
     }

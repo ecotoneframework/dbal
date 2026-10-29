@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace Test\Ecotone\Dbal\Integration;
 
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Api\Dbal\ExtensionObject\DbalConfiguration;
-use Ecotone\Api\Dbal\Gateway\DeadLetterGateway;
-use Ecotone\Api\ExtensionObject\MessageChannelBuilder;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\ExtensionObject\SimpleMessageChannelBuilder;
-use Ecotone\Api\Lite\Test\FlowTestSupport;
-use Ecotone\Api\Modelling\AggregateNotFoundException;
+use Ecotone\Dbal\Configuration\DbalConfiguration;
+use Ecotone\Dbal\Recoverability\DeadLetterGateway;
+use Ecotone\Lite\EcotoneLite;
+use Ecotone\Lite\Test\FlowTestSupport;
 use Ecotone\Messaging\Channel\Collector\Config\CollectorConfiguration;
 use Ecotone\Messaging\Channel\ExceptionalQueueChannel;
+use Ecotone\Messaging\Channel\MessageChannelBuilder;
 use Ecotone\Messaging\Channel\PollableChannel\PollableChannelConfiguration;
-use Ecotone\Test\ChannelTestSupport;
+use Ecotone\Messaging\Channel\SimpleMessageChannelBuilder;
+use Ecotone\Messaging\Config\ModulePackageList;
+use Ecotone\Messaging\Config\ServiceConfiguration;
+use Ecotone\Modelling\AggregateNotFoundException;
+use Enqueue\Dbal\DbalConnectionFactory;
 use RuntimeException;
 use Symfony\Component\Uid\Uuid;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
@@ -49,7 +50,7 @@ final class CollectorModuleTest extends DbalMessagingTestCase
         $ecotoneLite->sendCommand(new RegisterPerson(100, 'Johny'));
 
         $this->assertNotNull($ecotoneLite->sendQueryWithRouting('person.getName', metadata: ['aggregate.id' => 100]));
-        $this->assertNotNull(ChannelTestSupport::of($ecotoneLite)->getMessageChannel('notifications')->receive());
+        $this->assertNotNull($ecotoneLite->getMessageChannel('notifications')->receive());
     }
 
     public function test_failure_during_sending_should_rollback_transaction()
@@ -127,7 +128,7 @@ final class CollectorModuleTest extends DbalMessagingTestCase
         /** @var DeadLetterGateway $deadLetterGateway */
         $deadLetterGateway = $ecotoneLite->getGateway(DeadLetterGateway::class);
         foreach ($deadLetterGateway->list(1, 0) as $errorContext) {
-            $deadLetterGateway->replay($errorContext->getMessageId());
+            $deadLetterGateway->reply($errorContext->getMessageId());
         }
         $this->assertFalse($ecotoneLite->sendQueryWithRouting('notification.isNotified'));
 
@@ -145,12 +146,22 @@ final class CollectorModuleTest extends DbalMessagingTestCase
     {
         $this->setupUserTable();
 
-        return $this->bootstrapFlowTesting(
+        return EcotoneLite::bootstrapFlowTesting(
             $classesToResolve,
             $services,
-            extensionObjects: array_merge($extensionObjects, $channelBuilders, [DbalConfiguration::createWithDefaults()->withTransactionOnCommandBus(true)->withTransactionOnAsynchronousEndpoints(true)->withDoctrineORMRepositories(true), ]),
-            enabledModules: [ModulePackageList::DBAL_PACKAGE, ],
-            addInMemoryStateStoredRepository: false,
+            ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::ASYNCHRONOUS_PACKAGE]))
+                ->withExtensionObjects(array_merge(
+                    $extensionObjects,
+                    $channelBuilders,
+                    [
+                        DbalConfiguration::createWithDefaults()
+                            ->withTransactionOnCommandBus(true)
+                            ->withTransactionOnAsynchronousEndpoints(true)
+                            ->withDoctrineORMRepositories(true),
+                    ]
+                )),
+            addInMemoryStateStoredRepository: false
         );
     }
 }

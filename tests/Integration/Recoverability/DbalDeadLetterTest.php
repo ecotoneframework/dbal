@@ -2,17 +2,19 @@
 
 namespace Test\Ecotone\Dbal\Integration\Recoverability;
 
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Api\Dbal\ExtensionObject\DbalConfiguration;
-use Ecotone\Api\Dbal\Gateway\DeadLetterGateway;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\Lite\Test\FlowTestSupport;
-use Ecotone\Api\Messaging\ErrorContext;
-use Ecotone\Api\Messaging\ErrorMessage;
-use Ecotone\Api\Messaging\Message;
-use Ecotone\Dbal\Recoverability\DbalDeadLetterStore;
+use Ecotone\Dbal\Configuration\DbalConfiguration;
+use Ecotone\Dbal\Recoverability\DbalDeadLetterHandler;
+use Ecotone\Dbal\Recoverability\DeadLetterGateway;
+use Ecotone\Lite\EcotoneLite;
+use Ecotone\Lite\Test\FlowTestSupport;
+use Ecotone\Messaging\Config\ModulePackageList;
+use Ecotone\Messaging\Config\ServiceConfiguration;
 use Ecotone\Messaging\Handler\MessageHandlingException;
-use Ecotone\Test\StaticMessageBuilder;
+use Ecotone\Messaging\Handler\Recoverability\ErrorContext;
+use Ecotone\Messaging\Message;
+use Ecotone\Messaging\Support\ErrorMessage;
+use Ecotone\Messaging\Support\MessageBuilder;
+use Enqueue\Dbal\DbalConnectionFactory;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 use Throwable;
 
@@ -42,7 +44,7 @@ class DbalDeadLetterTest extends DbalMessagingTestCase
         $ecotone = $this->bootstrapEcotone();
         $gateway = $ecotone->getGateway(DeadLetterGateway::class);
 
-        $errorMessage = StaticMessageBuilder::withPayload('')->build();
+        $errorMessage = MessageBuilder::withPayload('')->build();
         $gateway->store($errorMessage);
 
         $retrievedMessage = $gateway->show($errorMessage->getHeaders()->getMessageId());
@@ -56,7 +58,7 @@ class DbalDeadLetterTest extends DbalMessagingTestCase
         $ecotone = $this->bootstrapEcotone();
         $gateway = $ecotone->getGateway(DeadLetterGateway::class);
 
-        $errorMessage = StaticMessageBuilder::withPayload('')->build();
+        $errorMessage = MessageBuilder::withPayload('')->build();
         $gateway->store($this->createFailedMessage($errorMessage));
 
         $this->assertEquals(
@@ -75,7 +77,7 @@ class DbalDeadLetterTest extends DbalMessagingTestCase
         $ecotone = $this->bootstrapEcotone();
         $gateway = $ecotone->getGateway(DeadLetterGateway::class);
 
-        $errorMessage = StaticMessageBuilder::withPayload('error1')
+        $errorMessage = MessageBuilder::withPayload('error1')
                                 ->setMultipleHeaders([
                                     ErrorContext::EXCEPTION_STACKTRACE => '#12',
                                     ErrorContext::EXCEPTION_LINE => 120,
@@ -97,7 +99,7 @@ class DbalDeadLetterTest extends DbalMessagingTestCase
         $ecotone = $this->bootstrapEcotone();
         $gateway = $ecotone->getGateway(DeadLetterGateway::class);
 
-        $message = StaticMessageBuilder::withPayload('error2')->build();
+        $message = MessageBuilder::withPayload('error2')->build();
 
         $this->assertEquals(0, $gateway->count());
 
@@ -114,22 +116,26 @@ class DbalDeadLetterTest extends DbalMessagingTestCase
     {
         $connectionFactory = $this->getConnectionFactory();
 
-        return $this->bootstrapFlowTesting(
+        return EcotoneLite::bootstrapFlowTesting(
             containerOrAvailableServices: [
                 DbalConnectionFactory::class => $connectionFactory,
             ],
-            extensionObjects: [DbalConfiguration::createWithDefaults()],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withEnvironment('prod')
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
+                ->withExtensionObjects([
+                    DbalConfiguration::createWithDefaults()
+                        ->withAutomaticTableInitialization(true),
+                ]),
             pathToRootCatalog: __DIR__ . '/../../../',
-            environment: 'prod',
         );
     }
 
     private function cleanUpTables(): void
     {
         $connection = $this->getConnection();
-        if (self::checkIfTableExists($connection, DbalDeadLetterStore::DEFAULT_DEAD_LETTER_TABLE)) {
-            $connection->executeStatement('DROP TABLE ' . DbalDeadLetterStore::DEFAULT_DEAD_LETTER_TABLE);
+        if (self::checkIfTableExists($connection, DbalDeadLetterHandler::DEFAULT_DEAD_LETTER_TABLE)) {
+            $connection->executeStatement('DROP TABLE ' . DbalDeadLetterHandler::DEFAULT_DEAD_LETTER_TABLE);
         }
     }
 }

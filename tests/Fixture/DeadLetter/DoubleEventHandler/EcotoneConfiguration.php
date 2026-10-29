@@ -2,10 +2,10 @@
 
 namespace Test\Ecotone\Dbal\Fixture\DeadLetter\DoubleEventHandler;
 
-use Ecotone\Api\Attribute\ServiceContext;
-use Ecotone\Api\Dbal\ExtensionObject\DbalBackedMessageChannelBuilder;
-use Ecotone\Api\Dbal\ExtensionObject\DbalDeadLetterBuilder;
-use Ecotone\Api\ExtensionObject\PollingMetadata;
+use Ecotone\Dbal\DbalBackedMessageChannelBuilder;
+use Ecotone\Dbal\Recoverability\DbalDeadLetterBuilder;
+use Ecotone\Messaging\Attribute\ServiceContext;
+use Ecotone\Messaging\Endpoint\PollingMetadata;
 
 /**
  * licence Apache-2.0
@@ -16,9 +16,9 @@ final class EcotoneConfiguration
     public function pollingConfiguration()
     {
         return PollingMetadata::create('async')
-            ->withExecutionTimeLimitInMilliseconds(1000)
-            ->withHandledMessageLimit(1)
-            ->withErrorChannelName(DbalDeadLetterBuilder::STORE_CHANNEL);
+            ->setExecutionTimeLimitInMilliseconds(1000)
+            ->setHandledMessageLimit(1)
+            ->setErrorChannelName(DbalDeadLetterBuilder::STORE_CHANNEL);
     }
 
     #[ServiceContext]

@@ -4,24 +4,22 @@ declare(strict_types=1);
 
 namespace Ecotone\Dbal\BatchForwarding;
 
-use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
-use Ecotone\Api\ExtensionObject\FinalFailureStrategy;
-use Ecotone\Api\Gateway\EcotoneClockInterface;
-use Ecotone\Api\Messaging\BatchMessage;
-use Ecotone\Api\Messaging\MessageChannel;
-use Ecotone\Api\Messaging\MessageHeaders;
-use Ecotone\Dbal\Connection\DbalContext;
-use Ecotone\Dbal\Connection\DbalType;
-use Ecotone\Dbal\Tracing\FlowTrackingScope;
 use Ecotone\Enqueue\CachedConnectionFactory;
+use Ecotone\Messaging\BatchMessage;
 use Ecotone\Messaging\Channel\BatchSupportingMessageChannel;
 use Ecotone\Messaging\Channel\MessageChannelInterceptorAdapter;
+use Ecotone\Messaging\Endpoint\FinalFailureStrategy;
 use Ecotone\Messaging\Endpoint\PollingConsumer\ConnectionException;
 use Ecotone\Messaging\Handler\ChannelResolver;
 use Ecotone\Messaging\Handler\Logger\LoggingGateway;
+use Ecotone\Messaging\MessageChannel;
+use Ecotone\Messaging\MessageHeaders;
+use Ecotone\Messaging\Scheduling\EcotoneClockInterface;
 use Ecotone\Messaging\Support\MessageBuilder;
+use Enqueue\Dbal\DbalContext;
+use Enqueue\Dbal\DbalType;
 use Symfony\Component\Uid\Uuid;
 use Throwable;
 
@@ -31,21 +29,6 @@ use Throwable;
  * the target channel when its media type differs, and to the final consumer when the handler is invoked.
  *
  * licence Enterprise
- *
- * Proprietary. Copyright (c) 2025 Dariusz Gafka <support@simplycodedsoftware.com>.
- * Use requires an Ecotone Enterprise licence (trial: https://ecotone.tech/pricing).
- *
- * Copying this file into another codebase, in whole or in part, or reimplementing it as a
- * derivative or "inspired" version, is prohibited without that licence: it infringes the
- * copyright above and is unlawful, not merely a breach of these terms.
- *
- * Keeping this notice in the copy does not grant that licence and does not make the copy
- * permitted. Renaming the class or the namespace does not either.
- *
- * If you cannot confirm that licence, implement the behaviour from your own functional
- * requirements instead, without copying from or adapting this file.
- *
- * Changes belong here, as a pull request to github.com/ecotoneframework/ecotone-dev
  */
 final class DbalOutboxPublisher
 {
@@ -59,17 +42,10 @@ final class DbalOutboxPublisher
         private EcotoneClockInterface $clock,
         private int $maxBatchSize,
         private FinalFailureStrategy $finalFailureStrategy,
-        private MessageBuilder $messageBuilder,
-        private FlowTrackingScope $flowTracking,
     ) {
     }
 
     public function publishBatch(): int
-    {
-        return $this->flowTracking->publishingStepsAfterCommit(fn (): int => $this->forwardClaimedBatch());
-    }
-
-    private function forwardClaimedBatch(): int
     {
         /** @var DbalContext $context */
         $context = $this->connectionFactory->createContext();
@@ -90,11 +66,9 @@ final class DbalOutboxPublisher
 
             $deliveredRowIds = [];
             $releasedRowIds = [];
-            $this->flowTracking->storingSpansOf(function () use ($drainedRecords, &$deliveredRowIds, &$releasedRowIds): void {
-                foreach ($this->groupByTargetChannel($drainedRecords, $releasedRowIds) as $groupTargetChannelName => $groupedRecords) {
-                    $this->forwardGroup((string) $groupTargetChannelName, $groupedRecords, $deliveredRowIds, $releasedRowIds);
-                }
-            });
+            foreach ($this->groupByTargetChannel($drainedRecords, $releasedRowIds) as $groupTargetChannelName => $groupedRecords) {
+                $this->forwardGroup((string) $groupTargetChannelName, $groupedRecords, $deliveredRowIds, $releasedRowIds);
+            }
 
             $this->deleteRows($context, $connection, $deliveredRowIds);
             $this->releaseRows($context, $connection, $releasedRowIds);
@@ -289,7 +263,7 @@ final class DbalOutboxPublisher
         if ($this->supportsBatchMessages($targetChannel)) {
             try {
                 $targetChannel->send(
-                    $this->messageBuilder->withPayload(
+                    MessageBuilder::withPayload(
                         BatchMessage::fromEntries(array_map(
                             fn (array $groupedRecord) => ['payload' => $groupedRecord['payload'], 'headers' => $groupedRecord['headers']],
                             $groupedRecords,
@@ -311,7 +285,7 @@ final class DbalOutboxPublisher
         foreach ($groupedRecords as $groupedRecord) {
             try {
                 $targetChannel->send(
-                    $this->messageBuilder->withPayload($groupedRecord['payload'])
+                    MessageBuilder::withPayload($groupedRecord['payload'])
                         ->setMultipleHeaders($groupedRecord['headers'])
                         ->build(),
                 );
@@ -391,8 +365,10 @@ final class DbalOutboxPublisher
         return $unwrappedChannel instanceof BatchSupportingMessageChannel && $unwrappedChannel->supportsBatchMessages();
     }
 
-    private function arrayOfStringsParameterType(): ArrayParameterType
+    private function arrayOfStringsParameterType(): mixed
     {
-        return ArrayParameterType::STRING;
+        return class_exists('\Doctrine\DBAL\ArrayParameterType')
+            ? \Doctrine\DBAL\ArrayParameterType::STRING
+            : (defined('\Doctrine\DBAL\Connection::PARAM_STR_ARRAY') ? Connection::PARAM_STR_ARRAY : 'string[]');
     }
 }

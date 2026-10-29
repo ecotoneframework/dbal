@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Test\Ecotone\Dbal\Fixture\DeduplicationCommandBus;
 
-use Ecotone\Api\Attribute\Deduplicated;
-use Ecotone\Api\Gateway\CommandBus;
+use Ecotone\Messaging\Attribute\Deduplicated;
+use Ecotone\Modelling\CommandBus;
 
 /**
  * licence Apache-2.0

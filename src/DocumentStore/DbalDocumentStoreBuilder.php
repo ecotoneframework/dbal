@@ -2,7 +2,6 @@
 
 namespace Ecotone\Dbal\DocumentStore;
 
-use Ecotone\Api\Gateway\EcotoneClockInterface;
 use Ecotone\Dbal\Database\DocumentStoreTableManager;
 use Ecotone\Dbal\DbalReconnectableConnectionFactory;
 use Ecotone\Enqueue\CachedConnectionFactory;
@@ -15,7 +14,7 @@ use Ecotone\Messaging\Handler\InputOutputMessageHandlerBuilder;
 use Ecotone\Messaging\Handler\InterfaceToCall;
 use Ecotone\Messaging\Handler\InterfaceToCallRegistry;
 use Ecotone\Messaging\Handler\ParameterConverterBuilder;
-use Ecotone\Messaging\Handler\ServiceActivator\MessageProcessorActivatorBuilder;
+use Ecotone\Messaging\Handler\ServiceActivator\ServiceActivatorBuilder;
 use Ecotone\Messaging\Store\Document\InMemoryDocumentStore;
 
 /**
@@ -45,7 +44,6 @@ final class DbalDocumentStoreBuilder extends InputOutputMessageHandlerBuilder
                     new Definition(CachedConnectionFactory::class, [
                         new Definition(DbalReconnectableConnectionFactory::class, [
                             new Reference($this->connectionReferenceName),
-                            new Reference(EcotoneClockInterface::class),
                         ]),
                     ], 'createFor'),
                     new Reference(ConversionService::REFERENCE_NAME),
@@ -56,7 +54,7 @@ final class DbalDocumentStoreBuilder extends InputOutputMessageHandlerBuilder
         }
 
 
-        return MessageProcessorActivatorBuilder::createForMethod(
+        return ServiceActivatorBuilder::create(
             $documentStoreReference,
             new InterfaceToCallReference(DbalDocumentStore::class, $this->method),
         )

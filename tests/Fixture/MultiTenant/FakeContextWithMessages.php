@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Test\Ecotone\Dbal\Fixture\MultiTenant;
 
-use Ecotone\Api\ExtensionObject\PollingMetadata;
-use Ecotone\Api\Messaging\PollableChannel;
 use Ecotone\Messaging\Channel\QueueChannel;
+use Ecotone\Messaging\Endpoint\PollingMetadata;
+use Ecotone\Messaging\PollableChannel;
 use Interop\Queue\Consumer;
 use Interop\Queue\Context;
 use Interop\Queue\Destination;
@@ -28,64 +28,68 @@ final class FakeContextWithMessages implements Context, PollableChannel
         $this->channel = QueueChannel::create();
     }
 
-    public function send(\Ecotone\Api\Messaging\Message $message): void
+    public function send(\Ecotone\Messaging\Message $message): void
     {
         $this->channel->send($message);
     }
 
-    public function receiveWithTimeout(PollingMetadata $pollingMetadata): ?\Ecotone\Api\Messaging\Message
+    public function receiveWithTimeout(PollingMetadata $pollingMetadata): ?\Ecotone\Messaging\Message
     {
         return $this->receive();
     }
 
-    public function receive(): ?\Ecotone\Api\Messaging\Message
+    public function receive(): ?\Ecotone\Messaging\Message
     {
         return $this->channel->receive();
     }
 
     public function createMessage(string $body = '', array $properties = [], array $headers = []): Message
     {
+        // TODO: Implement createMessage() method.
     }
 
     public function createTopic(string $topicName): Topic
     {
+        // TODO: Implement createTopic() method.
     }
 
     public function createQueue(string $queueName): Queue
     {
+        // TODO: Implement createQueue() method.
     }
 
     public function createTemporaryQueue(): Queue
     {
+        // TODO: Implement createTemporaryQueue() method.
     }
 
     public function createProducer(): Producer
     {
+        // TODO: Implement createProducer() method.
     }
 
     public function createConsumer(Destination $destination): Consumer
     {
+        // TODO: Implement createConsumer() method.
     }
 
     public function createSubscriptionConsumer(): SubscriptionConsumer
     {
+        // TODO: Implement createSubscriptionConsumer() method.
     }
 
     public function purgeQueue(Queue $queue): void
     {
+        // TODO: Implement purgeQueue() method.
     }
 
     public function close(): void
     {
+        // TODO: Implement close() method.
     }
 
     public function onConsumerStop(): void
     {
         // No cleanup needed for fake channels
-    }
-
-    public function __toString(): string
-    {
-        return 'fake context';
     }
 }

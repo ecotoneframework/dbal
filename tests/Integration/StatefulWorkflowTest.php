@@ -2,9 +2,10 @@
 
 namespace Test\Ecotone\Dbal\Integration;
 
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\ExtensionObject\SimpleMessageChannelBuilder;
-use Ecotone\Api\Lite\Test\FlowTestSupport;
+use Ecotone\Lite\EcotoneLite;
+use Ecotone\Lite\Test\FlowTestSupport;
+use Ecotone\Messaging\Config\ModulePackageList;
+use Ecotone\Messaging\Config\ServiceConfiguration;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 use Test\Ecotone\Dbal\Fixture\StatefulWorkflow\Audit;
 use Test\Ecotone\Dbal\Fixture\StatefulWorkflow\AuditConducted;
@@ -26,14 +27,13 @@ class StatefulWorkflowTest extends DbalMessagingTestCase
         $cycleGateway = $ecotone->getGateway(CycleGateway::class);
 
         $cycleGateway->submitAnAudit(cycleId: 'foo', audit: new Audit('123', new Certificate('234')));
-        $ecotone->run('cycle');
 
         self::assertEquals(
             [
                 new AuditConducted('foo', '123'),
                 new CertificateIssued('foo', '234'),
             ],
-            $ecotone->popRecordedEvents()
+            $ecotone->getRecordedEvents()
         );
 
         self::assertEquals(['123'], $cycleGateway->conductedAudits('foo'));
@@ -42,7 +42,7 @@ class StatefulWorkflowTest extends DbalMessagingTestCase
 
     private function bootstrapEcotone(): FlowTestSupport
     {
-        return $this->bootstrapFlowTesting(
+        return EcotoneLite::bootstrapFlowTesting(
             classesToResolve: [
                 Cycle::class,
                 CycleGateway::class,
@@ -52,10 +52,10 @@ class StatefulWorkflowTest extends DbalMessagingTestCase
                 new EventsConverters(),
                 $this->getConnectionFactory(),
             ],
-            extensionObjects: [SimpleMessageChannelBuilder::createQueueChannel('cycle')],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
+                ->withNamespaces(['Test\Ecotone\Dbal\Fixture\StatefulWorkflow']),
             pathToRootCatalog: __DIR__ . '/../../',
-            namespaces: ['Test\Ecotone\Dbal\Fixture\StatefulWorkflow'],
         );
     }
 }

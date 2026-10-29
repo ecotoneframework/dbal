@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Test\Ecotone\Dbal\Integration;
 
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Api\Dbal\ExtensionObject\DbalBackedMessageChannelBuilder;
-use Ecotone\Api\ExtensionObject\MediaType;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\ExtensionObject\ServiceConfiguration;
-use Ecotone\Api\Lite\Test\FlowTestSupport;
-use Ecotone\Api\Messaging\MessageHeaders;
+use Ecotone\Lite\EcotoneLite;
+use Ecotone\Lite\Test\FlowTestSupport;
+use Ecotone\Messaging\Config\ModulePackageList;
+use Ecotone\Messaging\Config\ServiceConfiguration;
+use Ecotone\Messaging\Conversion\MediaType;
+use Ecotone\Messaging\MessageHeaders;
+use Enqueue\Dbal\DbalConnectionFactory;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 use Test\Ecotone\Dbal\Fixture\Deduplication\Converter;
 use Test\Ecotone\Dbal\Fixture\Deduplication\OrderPlaced;
@@ -32,9 +32,9 @@ final class DeduplicationModuleTest extends DbalMessagingTestCase
     {
         $ecotone = $this->bootstrapEcotone();
 
-        $ecotone->sendCommandWithRouting(routingKey: 'placeOrder', command: 'milk', metadata: [MessageHeaders::MESSAGE_ID => '3e84ff08-b755-4e16-b50d-94818bf9de99']);
+        $ecotone->sendCommandWithRoutingKey(routingKey: 'placeOrder', command: 'milk', metadata: [MessageHeaders::MESSAGE_ID => '3e84ff08-b755-4e16-b50d-94818bf9de99']);
         $ecotone->run(self::CHANNEL_NAME);
-        $ecotone->sendCommandWithRouting(routingKey: 'placeOrder', command: 'milk', metadata: [MessageHeaders::MESSAGE_ID => '3e84ff08-b755-4e16-b50d-94818bf9de99']);
+        $ecotone->sendCommandWithRoutingKey(routingKey: 'placeOrder', command: 'milk', metadata: [MessageHeaders::MESSAGE_ID => '3e84ff08-b755-4e16-b50d-94818bf9de99']);
         $ecotone->run(self::CHANNEL_NAME);
 
         $result = $ecotone->sendQueryWithRouting(routingKey: 'order.getRegistered');
@@ -59,9 +59,9 @@ final class DeduplicationModuleTest extends DbalMessagingTestCase
     {
         $ecotone = $this->bootstrapEcotone();
 
-        $ecotone->sendCommandWithRouting(routingKey: 'placeOrder', command: 'milk', metadata: [MessageHeaders::MESSAGE_ID => '3e84ff08-b755-4e16-b50d-94818bf9de99']);
+        $ecotone->sendCommandWithRoutingKey(routingKey: 'placeOrder', command: 'milk', metadata: [MessageHeaders::MESSAGE_ID => '3e84ff08-b755-4e16-b50d-94818bf9de99']);
         $ecotone->run(self::CHANNEL_NAME);
-        $ecotone->sendCommandWithRouting(routingKey: 'placeOrder', command: 'cheese', metadata: [MessageHeaders::MESSAGE_ID => '3e84ff08-b755-4e16-b50d-94818bf9de98']);
+        $ecotone->sendCommandWithRoutingKey(routingKey: 'placeOrder', command: 'cheese', metadata: [MessageHeaders::MESSAGE_ID => '3e84ff08-b755-4e16-b50d-94818bf9de98']);
         $ecotone->run(self::CHANNEL_NAME);
 
         $result = $ecotone->sendQueryWithRouting(routingKey: 'order.getRegistered');
@@ -76,12 +76,12 @@ final class DeduplicationModuleTest extends DbalMessagingTestCase
         $ecotone = $this->bootstrapEcotone();
 
         $sameDeduplicationKey = '3e84ff08-b755-4e16-b50d-94818bf9de99';
-        $ecotone->sendCommandWithRouting(
+        $ecotone->sendCommandWithRoutingKey(
             routingKey: 'placeOrderSynchronously1',
             command: 'milk',
             metadata: ['orderId1' => $sameDeduplicationKey]
         );
-        $ecotone->sendCommandWithRouting(
+        $ecotone->sendCommandWithRoutingKey(
             routingKey: 'placeOrderSynchronously1',
             command: 'cheese',
             metadata: ['orderId1' => $sameDeduplicationKey]
@@ -98,12 +98,12 @@ final class DeduplicationModuleTest extends DbalMessagingTestCase
         $ecotone = $this->bootstrapEcotone();
 
         $sameDeduplicationKey = '3e84ff08-b755-4e16-b50d-94818bf9de99';
-        $ecotone->sendCommandWithRouting(
+        $ecotone->sendCommandWithRoutingKey(
             routingKey: 'placeOrderSynchronously1',
             command: 'milk',
             metadata: ['orderId1' => $sameDeduplicationKey]
         );
-        $ecotone->sendCommandWithRouting(
+        $ecotone->sendCommandWithRoutingKey(
             routingKey: 'placeOrderSynchronously2',
             command: 'cheese',
             metadata: ['orderId2' => $sameDeduplicationKey]
@@ -120,12 +120,12 @@ final class DeduplicationModuleTest extends DbalMessagingTestCase
         $ecotone = $this->bootstrapEcotone();
 
         $sameDeduplicationKey = '3e84ff08-b755-4e16-b50d-94818bf9de99';
-        $ecotone->sendCommandWithRouting(
+        $ecotone->sendCommandWithRoutingKey(
             routingKey: 'placeOrderSynchronously1',
             command: 'milk',
             metadata: ['orderId1' => $sameDeduplicationKey]
         );
-        $ecotone->sendCommandWithRouting(
+        $ecotone->sendCommandWithRoutingKey(
             routingKey: 'placeOrderSynchronously3',
             command: 'cheese',
             metadata: ['orderId1' => $sameDeduplicationKey]
@@ -168,41 +168,45 @@ final class DeduplicationModuleTest extends DbalMessagingTestCase
 
         // Bootstrap first Ecotone instance with transactions enabled
         $orderService1 = new OrderService();
-        $ecotone1 = $this->bootstrapFlowTesting(
+        $ecotone1 = EcotoneLite::bootstrapFlowTesting(
             classesToResolve: [OrderService::class, OrderSubscriber::class, Converter::class],
             containerOrAvailableServices: [$orderService1, new OrderSubscriber(), new Converter(), DbalConnectionFactory::class => $connectionFactory1],
-            extensionObjects: [
-                \Ecotone\Api\Dbal\ExtensionObject\DbalConfiguration::createWithDefaults()->withTransactionOnCommandBus(true)->withDeduplication(true),
-                DbalBackedMessageChannelBuilder::create(self::CHANNEL_NAME),
-                ServiceConfiguration::createWithDefaults()->withDefaultSerializationMediaType(MediaType::createApplicationJson()),
-            ],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withEnvironment('prod')
+                ->withDefaultSerializationMediaType(MediaType::createApplicationJson())
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
+                ->withExtensionObjects([
+                    \Ecotone\Dbal\Configuration\DbalConfiguration::createWithDefaults()
+                        ->withTransactionOnCommandBus(true)
+                        ->withDeduplication(true),
+                ])
+                ->withCacheDirectoryPath(sys_get_temp_dir() . '/ecotone-test-' . uniqid()),
             pathToRootCatalog: __DIR__ . '/../../',
-            environment: 'prod',
-            cacheDirectoryPath: sys_get_temp_dir().'/ecotone-test-'.uniqid(),
         );
 
         // Bootstrap second Ecotone instance
         $orderService2 = new OrderService();
-        $ecotone2 = $this->bootstrapFlowTesting(
+        $ecotone2 = EcotoneLite::bootstrapFlowTesting(
             classesToResolve: [OrderService::class, OrderSubscriber::class, Converter::class],
             containerOrAvailableServices: [$orderService2, new OrderSubscriber(), new Converter(), DbalConnectionFactory::class => $connectionFactory2],
-            extensionObjects: [
-                \Ecotone\Api\Dbal\ExtensionObject\DbalConfiguration::createWithDefaults()->withTransactionOnCommandBus(true)->withDeduplication(true),
-                DbalBackedMessageChannelBuilder::create(self::CHANNEL_NAME),
-                ServiceConfiguration::createWithDefaults()->withDefaultSerializationMediaType(MediaType::createApplicationJson()),
-            ],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withEnvironment('prod')
+                ->withDefaultSerializationMediaType(MediaType::createApplicationJson())
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
+                ->withExtensionObjects([
+                    \Ecotone\Dbal\Configuration\DbalConfiguration::createWithDefaults()
+                        ->withTransactionOnCommandBus(true)
+                        ->withDeduplication(true),
+                ])
+                ->withCacheDirectoryPath(sys_get_temp_dir() . '/ecotone-test-' . uniqid()),
             pathToRootCatalog: __DIR__ . '/../../',
-            environment: 'prod',
-            cacheDirectoryPath: sys_get_temp_dir().'/ecotone-test-'.uniqid(),
         );
 
         $messageId = '3e84ff08-b755-4e16-b50d-94818bf9de99';
 
         // Send command from instance 1 with transaction enabled
         // Deduplication should be inserted BEFORE handler due to transaction
-        $ecotone1->sendCommandWithRouting(
+        $ecotone1->sendCommandWithRoutingKey(
             routingKey: 'placeOrderSynchronously1',
             command: 'milk',
             metadata: ['orderId1' => $messageId]
@@ -210,7 +214,7 @@ final class DeduplicationModuleTest extends DbalMessagingTestCase
 
         // Send the same command from instance 2
         // This should be deduplicated and NOT execute the handler
-        $ecotone2->sendCommandWithRouting(
+        $ecotone2->sendCommandWithRoutingKey(
             routingKey: 'placeOrderSynchronously1',
             command: 'cheese',
             metadata: ['orderId1' => $messageId]
@@ -239,40 +243,44 @@ final class DeduplicationModuleTest extends DbalMessagingTestCase
 
         // Bootstrap first Ecotone instance WITHOUT transactions
         $orderService1 = new OrderService();
-        $ecotone1 = $this->bootstrapFlowTesting(
+        $ecotone1 = EcotoneLite::bootstrapFlowTesting(
             classesToResolve: [OrderService::class, OrderSubscriber::class, Converter::class],
             containerOrAvailableServices: [$orderService1, new OrderSubscriber(), new Converter(), DbalConnectionFactory::class => $connectionFactory1],
-            extensionObjects: [
-                \Ecotone\Api\Dbal\ExtensionObject\DbalConfiguration::createWithDefaults()->withTransactionOnCommandBus(false)->withDeduplication(true),
-                DbalBackedMessageChannelBuilder::create(self::CHANNEL_NAME),
-                ServiceConfiguration::createWithDefaults()->withDefaultSerializationMediaType(MediaType::createApplicationJson()),
-            ],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withEnvironment('prod')
+                ->withDefaultSerializationMediaType(MediaType::createApplicationJson())
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
+                ->withExtensionObjects([
+                    \Ecotone\Dbal\Configuration\DbalConfiguration::createWithDefaults()
+                        ->withTransactionOnCommandBus(false)
+                        ->withDeduplication(true),
+                ])
+                ->withCacheDirectoryPath(sys_get_temp_dir() . '/ecotone-test-' . uniqid()),
             pathToRootCatalog: __DIR__ . '/../../',
-            environment: 'prod',
-            cacheDirectoryPath: sys_get_temp_dir().'/ecotone-test-'.uniqid(),
         );
 
         // Bootstrap second Ecotone instance WITHOUT transactions
         $orderService2 = new OrderService();
-        $ecotone2 = $this->bootstrapFlowTesting(
+        $ecotone2 = EcotoneLite::bootstrapFlowTesting(
             classesToResolve: [OrderService::class, OrderSubscriber::class, Converter::class],
             containerOrAvailableServices: [$orderService2, new OrderSubscriber(), new Converter(), DbalConnectionFactory::class => $connectionFactory2],
-            extensionObjects: [
-                \Ecotone\Api\Dbal\ExtensionObject\DbalConfiguration::createWithDefaults()->withTransactionOnCommandBus(false)->withDeduplication(true),
-                DbalBackedMessageChannelBuilder::create(self::CHANNEL_NAME),
-                ServiceConfiguration::createWithDefaults()->withDefaultSerializationMediaType(MediaType::createApplicationJson()),
-            ],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withEnvironment('prod')
+                ->withDefaultSerializationMediaType(MediaType::createApplicationJson())
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
+                ->withExtensionObjects([
+                    \Ecotone\Dbal\Configuration\DbalConfiguration::createWithDefaults()
+                        ->withTransactionOnCommandBus(false)
+                        ->withDeduplication(true),
+                ])
+                ->withCacheDirectoryPath(sys_get_temp_dir() . '/ecotone-test-' . uniqid()),
             pathToRootCatalog: __DIR__ . '/../../',
-            environment: 'prod',
-            cacheDirectoryPath: sys_get_temp_dir().'/ecotone-test-'.uniqid(),
         );
 
         $messageId = '3e84ff08-b755-4e16-b50d-94818bf9de88';
 
         // Send command from instance 1 (handler executes FIRST, then deduplication inserted)
-        $ecotone1->sendCommandWithRouting(
+        $ecotone1->sendCommandWithRoutingKey(
             routingKey: 'placeOrderSynchronously1',
             command: 'milk',
             metadata: ['orderId1' => $messageId]
@@ -280,7 +288,7 @@ final class DeduplicationModuleTest extends DbalMessagingTestCase
 
         // Send the same command from instance 2
         // This should be deduplicated and NOT execute the handler
-        $ecotone2->sendCommandWithRouting(
+        $ecotone2->sendCommandWithRoutingKey(
             routingKey: 'placeOrderSynchronously1',
             command: 'cheese',
             metadata: ['orderId1' => $messageId]
@@ -296,14 +304,17 @@ final class DeduplicationModuleTest extends DbalMessagingTestCase
 
     private function bootstrapEcotone(): FlowTestSupport
     {
-        return $this->bootstrapFlowTesting(
+        return EcotoneLite::bootstrapFlowTesting(
             containerOrAvailableServices: [new OrderService(), new OrderSubscriber(), new Converter(), DbalConnectionFactory::class => $this->getConnectionFactory()],
-            extensionObjects: [ServiceConfiguration::createWithDefaults()->withDefaultSerializationMediaType(MediaType::createApplicationJson())],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE, ],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withEnvironment('prod')
+                ->withDefaultSerializationMediaType(MediaType::createApplicationJson())
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::ASYNCHRONOUS_PACKAGE]))
+                ->withNamespaces([
+                    'Test\Ecotone\Dbal\Fixture\Deduplication',
+                ])
+                ->withCacheDirectoryPath(sys_get_temp_dir() . '/ecotone-test-' . uniqid()),
             pathToRootCatalog: __DIR__ . '/../../',
-            namespaces: ['Test\Ecotone\Dbal\Fixture\Deduplication', ],
-            environment: 'prod',
-            cacheDirectoryPath: sys_get_temp_dir().'/ecotone-test-'.uniqid(),
         );
     }
 }

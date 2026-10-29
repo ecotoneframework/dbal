@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Test\Ecotone\Dbal\Integration;
 
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\Lite\Test\FlowTestSupport;
 use Ecotone\Dbal\DbalConnection;
+use Ecotone\Lite\EcotoneLite;
+use Ecotone\Lite\Test\FlowTestSupport;
+use Ecotone\Messaging\Config\ModulePackageList;
+use Ecotone\Messaging\Config\ServiceConfiguration;
+use Enqueue\Dbal\DbalConnectionFactory;
 use Exception;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 use Test\Ecotone\Dbal\Fixture\AsynchronousChannelWithInterceptor\AddMetadataInterceptor;
@@ -31,7 +33,7 @@ final class AsynchronousChannelTest extends DbalMessagingTestCase
         );
 
         self::assertCount(0, $ecotone
-            ->sendCommandWithRouting('order.register', 'milk')
+            ->sendCommandWithRoutingKey('order.register', 'milk')
             ->sendQueryWithRouting('order.getRegistered'));
 
         self::assertCount(1, $ecotone
@@ -40,7 +42,7 @@ final class AsynchronousChannelTest extends DbalMessagingTestCase
             ->sendQueryWithRouting('order.getRegistered'));
 
         self::assertCount(1, $ecotone
-            ->sendCommandWithRouting('order.register', 'milk')
+            ->sendCommandWithRoutingKey('order.register', 'milk')
             ->run('orders')
             ->run('processOrders')
             ->sendQueryWithRouting('order.getRegistered'));
@@ -56,7 +58,7 @@ final class AsynchronousChannelTest extends DbalMessagingTestCase
         );
 
         self::assertCount(1, $ecotone
-            ->sendCommandWithRouting('order.register_with_table_creation', 'milk')
+            ->sendCommandWithRoutingKey('order.register_with_table_creation', 'milk')
             ->run('orders')
             ->run('processOrders')
             ->sendQueryWithRouting('order.getRegistered'));
@@ -72,12 +74,12 @@ final class AsynchronousChannelTest extends DbalMessagingTestCase
         );
 
         try {
-            $ecotone->sendCommandWithRouting('order.prepareWithFailure');
+            $ecotone->sendCommandWithRoutingKey('order.prepareWithFailure');
         } catch (Exception) {
         }
 
         self::assertCount(1, $ecotone
-            ->sendCommandWithRouting('order.register', 'milk')
+            ->sendCommandWithRoutingKey('order.register', 'milk')
             ->run('orders')
             ->run('processOrders')
             ->sendQueryWithRouting('order.getRegistered'));
@@ -93,7 +95,7 @@ final class AsynchronousChannelTest extends DbalMessagingTestCase
             namespaces: ['Test\Ecotone\Dbal\Fixture\AsynchronousChannelWithInterceptor']
         );
 
-        $ecotone->sendCommandWithRouting('order.register', 'milk');
+        $ecotone->sendCommandWithRoutingKey('order.register', 'milk');
         self::assertCount(0, $ecotone->sendQueryWithRouting('order.getRegistered'));
 
         $ecotone->run('orders');
@@ -105,25 +107,27 @@ final class AsynchronousChannelTest extends DbalMessagingTestCase
         $connection = $this->getConnection();
         $connection->close();
 
-        $ecotone = $this->bootstrapFlowTesting(
-            containerOrAvailableServices: array_merge(
-                [
-                    new AddMetadataInterceptor(),
-                    new \Test\Ecotone\Dbal\Fixture\AsynchronousChannelWithInterceptor\OrderService(),
-                ],
-                [
-                    DbalConnectionFactory::class => DbalConnection::create(
-                        $connection
-                    ),
-                ]
-            ),
-            enabledModules: [ModulePackageList::DBAL_PACKAGE, ],
+        $ecotone = EcotoneLite::bootstrapFlowTesting(
+            containerOrAvailableServices:
+                array_merge(
+                    [
+                        new AddMetadataInterceptor(),
+                        new \Test\Ecotone\Dbal\Fixture\AsynchronousChannelWithInterceptor\OrderService(),
+                    ],
+                    [
+                        DbalConnectionFactory::class => DbalConnection::create(
+                            $connection
+                        ),
+                    ]
+                ),
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withEnvironment('prod')
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::ASYNCHRONOUS_PACKAGE]))
+                ->withNamespaces(['Test\Ecotone\Dbal\Fixture\AsynchronousChannelWithInterceptor']),
             pathToRootCatalog: __DIR__ . '/../../',
-            namespaces: ['Test\Ecotone\Dbal\Fixture\AsynchronousChannelWithInterceptor'],
-            environment: 'prod',
         );
 
-        $ecotone->sendCommandWithRouting('order.register', 'milk');
+        $ecotone->sendCommandWithRoutingKey('order.register', 'milk');
         self::assertCount(0, $ecotone->sendQueryWithRouting('order.getRegistered'));
 
         $ecotone->run('orders');
@@ -134,13 +138,13 @@ final class AsynchronousChannelTest extends DbalMessagingTestCase
     {
         $dbalConnectionFactory = $this->getConnectionFactory();
 
-        return $this->bootstrapFlowTesting(
+        return EcotoneLite::bootstrapFlowTesting(
             containerOrAvailableServices: array_merge($services, [DbalConnectionFactory::class => DbalConnection::fromConnectionFactory($dbalConnectionFactory), 'managerRegistry' => $dbalConnectionFactory]),
-            extensionObjects: [\Ecotone\Api\ExtensionObject\InstantRetryConfiguration::createWithDefaults()->withAsynchronousEndpointsRetry(false)],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE, ],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withEnvironment('prod')
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::ASYNCHRONOUS_PACKAGE]))
+                ->withNamespaces($namespaces),
             pathToRootCatalog: __DIR__ . '/../../',
-            namespaces: $namespaces,
-            environment: 'prod',
         );
     }
 }

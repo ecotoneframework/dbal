@@ -4,32 +4,32 @@ declare(strict_types=1);
 
 namespace Test\Ecotone\Dbal\Integration;
 
-use Ecotone\Api\Attribute\Asynchronous;
-use Ecotone\Api\Attribute\CommandHandler;
-use Ecotone\Api\Attribute\EventHandler;
-use Ecotone\Api\Attribute\QueryHandler;
-use Ecotone\Api\Attribute\Reference;
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Api\Dbal\ExtensionObject\DbalBackedMessageChannelBuilder;
-use Ecotone\Api\Dbal\ExtensionObject\DbalMessagePublisherConfiguration;
-use Ecotone\Api\ExtensionObject\ExecutionPollingMetadata;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\ExtensionObject\PollingMetadata;
-use Ecotone\Api\Gateway\EventBus;
-use Ecotone\Api\Gateway\MessagePublisher;
-use Ecotone\Api\Lite\Test\FlowTestSupport;
-use Ecotone\Api\Messaging\BatchMessage;
-use Ecotone\Api\Messaging\Message;
-use Ecotone\Api\Messaging\MessageHeaders;
-use Ecotone\Api\Messaging\PollableChannel;
-use Ecotone\Dbal\Database\EnqueueTableManager;
-use Ecotone\Dbal\Database\MissingTableInstructions;
+use Ecotone\Dbal\Configuration\DbalMessagePublisherConfiguration;
+use Ecotone\Dbal\DbalBackedMessageChannelBuilder;
+use Ecotone\Lite\EcotoneLite;
+use Ecotone\Lite\Test\FlowTestSupport;
+use Ecotone\Messaging\Attribute\Asynchronous;
+use Ecotone\Messaging\Attribute\Parameter\Reference;
+use Ecotone\Messaging\BatchMessage;
 use Ecotone\Messaging\Channel\DeliveryConfirmation\PublishingFailedException;
 use Ecotone\Messaging\Config\ConfigurationException;
+use Ecotone\Messaging\Config\ModulePackageList;
+use Ecotone\Messaging\Config\ServiceConfiguration;
+use Ecotone\Messaging\Endpoint\ExecutionPollingMetadata;
+use Ecotone\Messaging\Endpoint\PollingMetadata;
+use Ecotone\Messaging\Message;
+use Ecotone\Messaging\MessageHeaders;
+use Ecotone\Messaging\MessagePublisher;
+use Ecotone\Messaging\PollableChannel;
 use Ecotone\Messaging\Support\LicensingException;
-use Ecotone\Test\ChannelTestSupport;
+use Ecotone\Messaging\Support\MessageBuilder;
+use Ecotone\Modelling\Attribute\CommandHandler;
+use Ecotone\Modelling\Attribute\EventHandler;
+use Ecotone\Modelling\Attribute\QueryHandler;
+use Ecotone\Modelling\EventBus;
 use Ecotone\Test\LicenceTesting;
-use Ecotone\Test\StaticMessageBuilder;
+use Enqueue\Dbal\DbalConnectionFactory;
+use Interop\Queue\Exception\Exception;
 use Symfony\Component\Uid\Uuid;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 use Test\Ecotone\Dbal\Fixture\HighThroughputPublishing\OrderWasPlaced;
@@ -45,11 +45,11 @@ final class HighThroughputPublishingTest extends DbalMessagingTestCase
         $orderService = $this->createOrderService();
         $messaging = $this->bootstrapEcotoneWithChannel($orderService, LicenceTesting::VALID_LICENCE);
 
-        $messaging->sendCommandWithRouting('order.place', 'espresso');
+        $messaging->sendCommandWithRoutingKey('order.place', 'espresso');
 
         $this->assertSame([], $messaging->sendQueryWithRouting('order.getReceived'));
 
-        $messaging->run('asyncOrdersChannel', ExecutionPollingMetadata::createWithTestingSetup(handledMessageLimit: 3, executionTimeLimitInMilliseconds: 10000));
+        $messaging->run('asyncOrdersChannel', ExecutionPollingMetadata::createWithTestingSetup(amountOfMessagesToHandle: 3, maxExecutionTimeInMilliseconds: 10000));
 
         $this->assertSame(
             ['espresso-1', 'espresso-2', 'espresso-3'],
@@ -70,11 +70,15 @@ final class HighThroughputPublishingTest extends DbalMessagingTestCase
     {
         $this->expectException(LicensingException::class);
 
-        $this->bootstrapFlowTesting(
+        EcotoneLite::bootstrapFlowTesting(
             [],
             [DbalConnectionFactory::class => $this->getConnectionFactory()],
-            extensionObjects: [DbalMessagePublisherConfiguration::create(MessagePublisher::class, Uuid::v7()->toRfc4122())->withHighThroughputPublishing()],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE]))
+                ->withExtensionObjects([
+                    DbalMessagePublisherConfiguration::create(MessagePublisher::class, Uuid::v7()->toRfc4122())
+                        ->withHighThroughputPublishing(),
+                ]),
         );
     }
 
@@ -104,7 +108,7 @@ final class HighThroughputPublishingTest extends DbalMessagingTestCase
         );
 
         $receivedPayloads = [];
-        while ($message = $this->receiveImmediatelyFrom(ChannelTestSupport::of($messaging)->getMessageChannel($queueName))) {
+        while ($message = $messaging->getMessageChannel($queueName)->receive()) {
             $receivedPayloads[] = $message->getPayload();
         }
         sort($receivedPayloads);
@@ -118,8 +122,8 @@ final class HighThroughputPublishingTest extends DbalMessagingTestCase
 
         $this->expectException(ConfigurationException::class);
 
-        ChannelTestSupport::of($messaging)->getMessageChannel($queueName)->send(
-            StaticMessageBuilder::withPayload(BatchMessage::constructEmpty()->append('first order'))->build()
+        $messaging->getMessageChannel($queueName)->send(
+            MessageBuilder::withPayload(BatchMessage::constructEmpty()->append('first order'))->build()
         );
     }
 
@@ -148,21 +152,23 @@ final class HighThroughputPublishingTest extends DbalMessagingTestCase
                 );
             }
         };
-        $messaging = $this->bootstrapFlowTesting(
+        $messaging = EcotoneLite::bootstrapFlowTesting(
             [$commandHandler::class],
             [DbalConnectionFactory::class => $this->getConnectionFactory(), $commandHandler],
-            extensionObjects: [
-                DbalMessagePublisherConfiguration::create(MessagePublisher::class, $queueName)->withHighThroughputPublishing(),
-                DbalBackedMessageChannelBuilder::create($queueName),
-            ],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::ASYNCHRONOUS_PACKAGE, ModulePackageList::DBAL_PACKAGE]))
+                ->withExtensionObjects([
+                    DbalMessagePublisherConfiguration::create(MessagePublisher::class, $queueName)
+                        ->withHighThroughputPublishing(),
+                    DbalBackedMessageChannelBuilder::create($queueName),
+                ]),
             licenceKey: LicenceTesting::VALID_LICENCE,
         );
 
-        $messaging->sendCommandWithRouting('order.placeBatch', 'espresso');
+        $messaging->sendCommandWithRoutingKey('order.placeBatch', 'espresso');
 
         $receivedPayloads = [];
-        while ($message = $this->receiveImmediatelyFrom(ChannelTestSupport::of($messaging)->getMessageChannel($queueName))) {
+        while ($message = $messaging->getMessageChannel($queueName)->receive()) {
             $receivedPayloads[] = $message->getPayload();
         }
         sort($receivedPayloads);
@@ -181,9 +187,9 @@ final class HighThroughputPublishingTest extends DbalMessagingTestCase
                 ->append('delayed order', [MessageHeaders::DELIVERY_DELAY => 3000])
         );
 
-        $channel = ChannelTestSupport::of($messaging)->getMessageChannel($queueName);
+        $channel = $messaging->getMessageChannel($queueName);
         $this->assertSame('immediate order', $channel->receive()->getPayload());
-        $this->assertNull($channel->receiveWithTimeout(PollingMetadata::create('assertNotYetDelivered')->withExecutionTimeLimitInMilliseconds(500)));
+        $this->assertNull($channel->receiveWithTimeout(PollingMetadata::create('assertNotYetDelivered')->setExecutionTimeLimitInMilliseconds(500)));
 
         $this->assertSame('delayed order', $this->receiveWithDeadline($channel, 10)?->getPayload());
     }
@@ -202,12 +208,12 @@ final class HighThroughputPublishingTest extends DbalMessagingTestCase
 
         sleep(2);
 
-        $channel = ChannelTestSupport::of($messaging)->getMessageChannel($queueName);
+        $channel = $messaging->getMessageChannel($queueName);
         $this->assertSame('kept order', $channel->receive()->getPayload());
-        $this->assertNull($this->receiveImmediatelyFrom($channel));
+        $this->assertNull($channel->receive());
     }
 
-    public function test_publishing_after_queue_table_is_dropped_names_the_message_queue_setup_command(): void
+    public function test_publishing_after_queue_table_is_dropped_throws(): void
     {
         $queueName = Uuid::v7()->toRfc4122();
         $messaging = $this->bootstrapPublisher($queueName, highThroughputPublishing: true);
@@ -216,8 +222,7 @@ final class HighThroughputPublishingTest extends DbalMessagingTestCase
 
         $this->getConnection()->executeStatement('DROP TABLE enqueue');
 
-        $this->expectException(ConfigurationException::class);
-        $this->expectExceptionMessage(MissingTableInstructions::build(EnqueueTableManager::FEATURE_NAME, EnqueueTableManager::DEFAULT_TABLE_NAME, null));
+        $this->expectException(Exception::class);
 
         $publisher->send('order published into missing table');
     }
@@ -266,11 +271,15 @@ final class HighThroughputPublishingTest extends DbalMessagingTestCase
 
     private function bootstrapEcotoneWithChannel(object $orderService, ?string $licenceKey): FlowTestSupport
     {
-        return $this->bootstrapFlowTesting(
+        return EcotoneLite::bootstrapFlowTesting(
             [$orderService::class],
             [DbalConnectionFactory::class => $this->getConnectionFactory(), $orderService],
-            extensionObjects: [DbalBackedMessageChannelBuilder::create('asyncOrdersChannel')->withHighThroughputPublishing()],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::ASYNCHRONOUS_PACKAGE, ModulePackageList::DBAL_PACKAGE]))
+                ->withExtensionObjects([
+                    DbalBackedMessageChannelBuilder::create('asyncOrdersChannel')
+                        ->withHighThroughputPublishing(),
+                ]),
             licenceKey: $licenceKey,
         );
     }
@@ -282,14 +291,15 @@ final class HighThroughputPublishingTest extends DbalMessagingTestCase
             $publisherConfiguration = $publisherConfiguration->withHighThroughputPublishing();
         }
 
-        return $this->bootstrapFlowTesting(
+        return EcotoneLite::bootstrapFlowTesting(
             [],
             [DbalConnectionFactory::class => $this->getConnectionFactory()],
-            extensionObjects: [
-                $publisherConfiguration,
-                DbalBackedMessageChannelBuilder::create($queueName),
-            ],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
+            ServiceConfiguration::createWithDefaults()
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::ASYNCHRONOUS_PACKAGE, ModulePackageList::DBAL_PACKAGE]))
+                ->withExtensionObjects([
+                    $publisherConfiguration,
+                    DbalBackedMessageChannelBuilder::create($queueName),
+                ]),
             licenceKey: LicenceTesting::VALID_LICENCE,
         );
     }

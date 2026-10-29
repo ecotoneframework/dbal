@@ -3,23 +3,16 @@
 namespace Test\Ecotone\Dbal;
 
 use Doctrine\DBAL\Connection;
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Api\ExtensionObject\PollingMetadata;
-use Ecotone\Api\ExtensionObject\TestConfiguration;
-use Ecotone\Api\Lite\EcotoneLite;
-use Ecotone\Api\Lite\Test\FlowTestSupport;
-use Ecotone\Api\Messaging\Message;
-use Ecotone\Api\Messaging\PollableChannel;
 use Ecotone\Dbal\DbalConnection;
-use Ecotone\Dbal\Deduplication\DbalHandledMessages;
+use Ecotone\Dbal\Deduplication\DeduplicationInterceptor;
 use Ecotone\Dbal\DocumentStore\DbalDocumentStore;
 use Ecotone\Dbal\EcotoneManagerRegistryConnectionFactory;
 use Ecotone\Dbal\ManagerRegistryEmulator;
-use Ecotone\Dbal\Recoverability\DbalDeadLetterStore;
-use Ecotone\Enqueue\ConnectionFactory;
+use Ecotone\Dbal\Recoverability\DbalDeadLetterHandler;
 use Ecotone\Test\ComponentTestBuilder;
+use Enqueue\Dbal\DbalConnectionFactory;
+use Interop\Queue\ConnectionFactory;
 use PHPUnit\Framework\TestCase;
-use Psr\Container\ContainerInterface;
 use Test\Ecotone\Dbal\Fixture\Transaction\OrderService;
 
 /**
@@ -76,11 +69,9 @@ abstract class DbalMessagingTestCase extends TestCase
     {
         self::deleteTable('enqueue', $connection);
         self::deleteTable(OrderService::ORDER_TABLE, $connection);
-        self::deleteTable(DbalDeadLetterStore::DEFAULT_DEAD_LETTER_TABLE, $connection);
+        self::deleteTable(DbalDeadLetterHandler::DEFAULT_DEAD_LETTER_TABLE, $connection);
         self::deleteTable(DbalDocumentStore::ECOTONE_DOCUMENT_STORE, $connection);
-        self::deleteTable(DbalHandledMessages::DEFAULT_DEDUPLICATION_TABLE, $connection);
-        self::deleteTable(\Ecotone\Dbal\Database\SpansTableManager::DEFAULT_TABLE, $connection);
-        self::deleteTable(\Ecotone\Dbal\Database\PulseTrackingTableManager::DEFAULT_TABLE, $connection);
+        self::deleteTable(DeduplicationInterceptor::DEFAULT_DEDUPLICATION_TABLE, $connection);
         self::deleteTable('persons', $connection);
         self::deleteTable('activities', $connection);
     }
@@ -148,11 +139,6 @@ abstract class DbalMessagingTestCase extends TestCase
         }
     }
 
-    protected function receiveImmediatelyFrom(PollableChannel $channel): ?Message
-    {
-        return $channel->receiveWithTimeout(PollingMetadata::create('test')->withExecutionTimeLimitInMilliseconds(100));
-    }
-
     protected function connectionForTenantB(): ConnectionFactory
     {
         if (isset($this->tenantBConnection)) {
@@ -202,49 +188,8 @@ abstract class DbalMessagingTestCase extends TestCase
         );
     }
 
-    private static function getSchemaManager(Connection $connection): \Doctrine\DBAL\Schema\AbstractSchemaManager
+    private static function getSchemaManager(Connection $connection): ?\Doctrine\DBAL\Schema\AbstractSchemaManager
     {
-        return $connection->createSchemaManager();
-    }
-
-    /**
-     * @param string[] $classesToResolve
-     * @param object[] $extensionObjects
-     * @param string[]|null $enabledModules
-     * @param array<string,mixed> $configurationVariables
-     * @param string[] $namespaces
-     */
-    protected function bootstrapFlowTesting(
-        array $classesToResolve = [],
-        ContainerInterface|array $containerOrAvailableServices = [],
-        array $extensionObjects = [],
-        ?array $enabledModules = null,
-        array $configurationVariables = [],
-        ?string $pathToRootCatalog = null,
-        bool $allowGatewaysToBeRegisteredInContainer = false,
-        bool $addInMemoryStateStoredRepository = true,
-        bool $addInMemoryEventSourcedRepository = true,
-        ?TestConfiguration $testConfiguration = null,
-        ?string $licenceKey = null,
-        array $namespaces = [],
-        string $environment = 'dev',
-        ?string $cacheDirectoryPath = null,
-    ): FlowTestSupport {
-        return EcotoneLite::bootstrapFlowTesting(
-            $classesToResolve,
-            $containerOrAvailableServices,
-            $extensionObjects,
-            $enabledModules,
-            $configurationVariables,
-            $pathToRootCatalog,
-            $allowGatewaysToBeRegisteredInContainer,
-            $addInMemoryStateStoredRepository,
-            $addInMemoryEventSourcedRepository,
-            $testConfiguration,
-            $licenceKey,
-            $namespaces,
-            $environment,
-            $cacheDirectoryPath,
-        );
+        return method_exists($connection, 'getSchemaManager') ? $connection->getSchemaManager() : $connection->createSchemaManager();
     }
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Test\Ecotone\Dbal\Integration;
 
+use Ecotone\Lite\EcotoneLite;
+use Ecotone\Messaging\Config\ServiceConfiguration;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
 use Test\Ecotone\Dbal\Fixture\Calendar\CalendarCreated;
 use Test\Ecotone\Dbal\Fixture\Calendar\CreateCalendar;
@@ -29,10 +31,13 @@ final class CreateAggregateByStateBasedAggregateTest extends DbalMessagingTestCa
 {
     public function test_state_based_aggregate_can_create_another_state_based_aggregate(): void
     {
-        $ecotone = $this->bootstrapFlowTesting(
+        $ecotone = EcotoneLite::bootstrapFlowTesting(
             classesToResolve: [Calendar::class, Meeting::class],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withNamespaces([
+                    'Test\Ecotone\Dbal\Fixture\CreateStateBasedAggregateByStateBasedAggregate',
+                ]),
             pathToRootCatalog: __DIR__ . '/../../',
-            namespaces: ['Test\Ecotone\Dbal\Fixture\CreateStateBasedAggregateByStateBasedAggregate', ],
         );
 
         $calendarId = 'calendar-1';
@@ -49,10 +54,13 @@ final class CreateAggregateByStateBasedAggregateTest extends DbalMessagingTestCa
 
     public function test_state_based_aggregate_can_create_event_sourcing_aggregate_with_internal_recorder(): void
     {
-        $ecotone = $this->bootstrapFlowTesting(
+        $ecotone = EcotoneLite::bootstrapFlowTesting(
             classesToResolve: [Calendar::class, MeetingWithEventSourcing::class],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withNamespaces([
+                    'Test\Ecotone\Dbal\Fixture\CreateStateBasedAggregateByStateBasedAggregate',
+                ]),
             pathToRootCatalog: __DIR__ . '/../../',
-            namespaces: ['Test\Ecotone\Dbal\Fixture\CreateStateBasedAggregateByStateBasedAggregate', ],
         );
 
         $calendarId = 'calendar-1';
@@ -71,10 +79,13 @@ final class CreateAggregateByStateBasedAggregateTest extends DbalMessagingTestCa
 
     public function test_state_based_aggregate_with_internal_recorder_can_create_another_state_based_aggregate(): void
     {
-        $ecotone = $this->bootstrapFlowTesting(
+        $ecotone = EcotoneLite::bootstrapFlowTesting(
             classesToResolve: [CalendarWithInternalRecorder::class, Meeting::class],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withNamespaces([
+                    'Test\Ecotone\Dbal\Fixture\CreateStateBasedAggregateByStateBasedAggregate',
+                ]),
             pathToRootCatalog: __DIR__ . '/../../',
-            namespaces: ['Test\Ecotone\Dbal\Fixture\CreateStateBasedAggregateByStateBasedAggregate', ],
         );
 
         $calendarId = 'calendar-1';
@@ -90,7 +101,7 @@ final class CreateAggregateByStateBasedAggregateTest extends DbalMessagingTestCa
                 new CalendarCreated($calendarId),
                 new MeetingScheduled($calendarId, $meetingId),
             ],
-            $ecotone->popRecordedEvents()
+            $ecotone->getRecordedEvents()
         );
 
         self::assertEquals(new Meeting($meetingId), $ecotone->getAggregate(Meeting::class, $meetingId));
@@ -99,10 +110,13 @@ final class CreateAggregateByStateBasedAggregateTest extends DbalMessagingTestCa
 
     public function test_state_based_aggregate_with_internal_recorder_can_create_another_state_based_aggregate_with_its_own_internal_recorder(): void
     {
-        $ecotone = $this->bootstrapFlowTesting(
+        $ecotone = EcotoneLite::bootstrapFlowTesting(
             classesToResolve: [CalendarWithInternalRecorder::class, MeetingWithInternalRecorder::class],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withNamespaces([
+                    'Test\Ecotone\Dbal\Fixture\CreateStateBasedAggregateByStateBasedAggregate',
+                ]),
             pathToRootCatalog: __DIR__ . '/../../',
-            namespaces: ['Test\Ecotone\Dbal\Fixture\CreateStateBasedAggregateByStateBasedAggregate', ],
         );
 
         $calendarId = 'calendar-1';
@@ -119,7 +133,7 @@ final class CreateAggregateByStateBasedAggregateTest extends DbalMessagingTestCa
                 new MeetingScheduled($calendarId, $meetingId),
                 new MeetingCreated($meetingId),
             ],
-            $ecotone->popRecordedEvents()
+            $ecotone->getRecordedEvents()
         );
 
         $meeting = $ecotone->getAggregate(MeetingWithInternalRecorder::class, $meetingId);
@@ -130,10 +144,13 @@ final class CreateAggregateByStateBasedAggregateTest extends DbalMessagingTestCa
 
     public function test_state_based_aggregate_with_internal_recorder_can_create_event_sourcing_aggregate_with_internal_recorder(): void
     {
-        $ecotone = $this->bootstrapFlowTesting(
+        $ecotone = EcotoneLite::bootstrapFlowTesting(
             classesToResolve: [CalendarWithInternalRecorder::class, MeetingWithEventSourcing::class],
+            configuration: ServiceConfiguration::createWithDefaults()
+                ->withNamespaces([
+                    'Test\Ecotone\Dbal\Fixture\CreateStateBasedAggregateByStateBasedAggregate',
+                ]),
             pathToRootCatalog: __DIR__ . '/../../',
-            namespaces: ['Test\Ecotone\Dbal\Fixture\CreateStateBasedAggregateByStateBasedAggregate', ],
         );
 
         $calendarId = 'calendar-1';
@@ -150,7 +167,7 @@ final class CreateAggregateByStateBasedAggregateTest extends DbalMessagingTestCa
                 new MeetingScheduled($calendarId, $meetingId),
                 new MeetingCreated($meetingId),
             ],
-            $ecotone->popRecordedEvents()
+            $ecotone->getRecordedEvents()
         );
 
         $meeting = $ecotone->getAggregate(MeetingWithEventSourcing::class, $meetingId);

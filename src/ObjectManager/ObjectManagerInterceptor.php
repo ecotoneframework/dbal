@@ -4,15 +4,14 @@ namespace Ecotone\Dbal\ObjectManager;
 
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
-use Ecotone\Api\Attribute\Reference;
-use Ecotone\Api\Attribute\WithoutDatabaseTransaction;
-use Ecotone\Api\Dbal\ManagerRegistryConnectionFactory;
-use Ecotone\Api\Interceptor\MethodInvocation;
-use Ecotone\Api\Messaging\Message;
 use Ecotone\Dbal\EcotoneManagerRegistryConnectionFactory;
 use Ecotone\Dbal\MultiTenant\MultiTenantConnectionFactory;
-use Ecotone\Dbal\MultiTenant\Pulse\PulseSnapshotRequest;
+use Ecotone\Messaging\Attribute\Parameter\Reference;
+use Ecotone\Messaging\Attribute\WithoutDatabaseTransaction;
 use Ecotone\Messaging\Handler\Logger\LoggingGateway;
+use Ecotone\Messaging\Handler\Processor\MethodInvoker\MethodInvocation;
+use Ecotone\Messaging\Message;
+use Enqueue\Dbal\ManagerRegistryConnectionFactory;
 use Throwable;
 
 /**
@@ -40,10 +39,6 @@ class ObjectManagerInterceptor
 
         foreach ($this->managerRegistryConnectionFactories as $managerRegistryConnectionFactory) {
             if ($managerRegistryConnectionFactory instanceof MultiTenantConnectionFactory) {
-                if (! $managerRegistryConnectionFactory->hasActiveTenant() && PulseSnapshotRequest::isIn($message)) {
-                    continue;
-                }
-
                 $managerRegistryConnectionFactory = $managerRegistryConnectionFactory->getConnectionFactory();
             }
 

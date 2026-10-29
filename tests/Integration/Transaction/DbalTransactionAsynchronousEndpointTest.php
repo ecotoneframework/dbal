@@ -5,24 +5,18 @@ declare(strict_types=1);
 namespace Test\Ecotone\Dbal\Integration\Transaction;
 
 use Doctrine\DBAL\Connection;
-use Ecotone\Api\Dbal\DbalConnectionFactory;
-use Ecotone\Api\Dbal\ExtensionObject\DbalBackedMessageChannelBuilder;
-use Ecotone\Api\Dbal\ExtensionObject\DbalConfiguration;
-use Ecotone\Api\Dbal\ExtensionObject\MultiTenantConfiguration;
-use Ecotone\Api\Dbal\Gateway\DeadLetterGateway;
-use Ecotone\Api\ExtensionObject\ExecutionPollingMetadata;
-use Ecotone\Api\ExtensionObject\InstantRetryConfiguration;
-use Ecotone\Api\ExtensionObject\ModulePackageList;
-use Ecotone\Api\ExtensionObject\ServiceConfiguration;
-use Ecotone\Api\Lite\EcotoneLite;
-use Ecotone\Api\Modelling\AggregateNotFoundException;
-use Ecotone\Dbal\Database\DeduplicationTableManager;
-use Ecotone\Dbal\Database\DocumentStoreTableManager;
-use Ecotone\Dbal\Database\EnqueueTableManager;
-use Ecotone\Dbal\Deduplication\DbalHandledMessages;
-use Ecotone\Dbal\DocumentStore\DbalDocumentStore;
+use Ecotone\Dbal\Configuration\DbalConfiguration;
+use Ecotone\Dbal\DbalBackedMessageChannelBuilder;
+use Ecotone\Dbal\MultiTenant\MultiTenantConfiguration;
+use Ecotone\Dbal\Recoverability\DeadLetterGateway;
+use Ecotone\Lite\EcotoneLite;
+use Ecotone\Messaging\Config\ModulePackageList;
+use Ecotone\Messaging\Config\ServiceConfiguration;
+use Ecotone\Messaging\Endpoint\ExecutionPollingMetadata;
 use Ecotone\Messaging\Handler\Logger\EchoLogger;
-use Ecotone\Test\LicenceTesting;
+use Ecotone\Modelling\AggregateNotFoundException;
+use Ecotone\Modelling\Config\InstantRetry\InstantRetryConfiguration;
+use Enqueue\Dbal\DbalConnectionFactory;
 use Exception;
 use PHPUnit\Framework\Attributes\Group;
 use Test\Ecotone\Dbal\DbalMessagingTestCase;
@@ -49,26 +43,29 @@ final class DbalTransactionAsynchronousEndpointTest extends DbalMessagingTestCas
 
     public function test_turning_on_transactions_for_polling_consumer()
     {
-        $ecotoneLite = $this->bootstrapFlowTesting(
+        $ecotoneLite = EcotoneLite::bootstrapFlowTesting(
             [Person::class, MultipleInternalCommandsService::class],
             [new MultipleInternalCommandsService(), DbalConnectionFactory::class => $this->getORMConnectionFactory([__DIR__.'/../Fixture/ORM/Person'])],
-            extensionObjects: [
-                DbalConfiguration::createWithDefaults()->withTransactionOnAsynchronousEndpoints(true)->withTransactionOnCommandBus(false)->withDoctrineORMRepositories(true),
-                DbalBackedMessageChannelBuilder::create('async'),
-            ],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
-            addInMemoryStateStoredRepository: false,
-            licenceKey: LicenceTesting::VALID_LICENCE,
+            ServiceConfiguration::createWithDefaults()
+                ->withExtensionObjects([
+                    DbalConfiguration::createWithDefaults()
+                        ->withTransactionOnAsynchronousEndpoints(true)
+                        ->withTransactionOnCommandBus(false)
+                        ->withDoctrineORMRepositories(true),
+                    DbalBackedMessageChannelBuilder::create('async'),
+                ])
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::ASYNCHRONOUS_PACKAGE, ModulePackageList::DBAL_PACKAGE])),
+            addInMemoryStateStoredRepository: false
         );
 
         /** This ensures for mysql that deduplication table will be created in first run and solves implicit commit */
-        $ecotoneLite->sendCommandWithRouting('multipleInternalCommands', [['personId' => 99, 'personName' => 'Johny', 'exception' => false]]);
-        $ecotoneLite->sendCommandWithRouting('multipleInternalCommands', [
+        $ecotoneLite->sendCommandWithRoutingKey('multipleInternalCommands', [['personId' => 99, 'personName' => 'Johny', 'exception' => false]]);
+        $ecotoneLite->sendCommandWithRoutingKey('multipleInternalCommands', [
             ['personId' => 100, 'personName' => 'Johny', 'exception' => false],
             ['personId' => 101, 'personName' => 'Johny', 'exception' => true],
         ]);
 
-        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(handledMessageLimit: 2, executionTimeLimitInMilliseconds: 5000, stopOnError: false));
+        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(amountOfMessagesToHandle: 2, maxExecutionTimeInMilliseconds: 5000, failAtError: false));
 
         /** Should be rolled back */
         $aggregateCommitted = true;
@@ -95,30 +92,35 @@ final class DbalTransactionAsynchronousEndpointTest extends DbalMessagingTestCas
         }
 
         // Now create the actual test instance with the connection breaking module
-        $ecotoneLite = $this->bootstrapFlowTesting(
+        $ecotoneLite = EcotoneLite::bootstrapFlowTesting(
             [Person::class, MultipleInternalCommandsService::class, ConnectionBreakingModule::class],
             [
                 new MultipleInternalCommandsService(),
                 DbalConnectionFactory::class => $this->getORMConnectionFactory([__DIR__.'/../Fixture/ORM/Person']),
                 //                "logger" => new EchoLogger()
             ],
-            extensionObjects: [
-                DbalConfiguration::createWithDefaults()->withTransactionOnAsynchronousEndpoints(true)->withTransactionOnCommandBus(false)->withDoctrineORMRepositories(true),
-                DbalBackedMessageChannelBuilder::create('async'),
-                ConnectionBreakingConfiguration::createWithBreakBeforeCommit([false, false, false, true]),
-            ],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
-            addInMemoryStateStoredRepository: false,
-            licenceKey: LicenceTesting::VALID_LICENCE,
+            ServiceConfiguration::createWithDefaults()
+                ->withExtensionObjects([
+                    DbalConfiguration::createWithDefaults()
+                        ->withTransactionOnAsynchronousEndpoints(true)
+                        ->withTransactionOnCommandBus(false)
+                        ->withDoctrineORMRepositories(true),
+                    DbalBackedMessageChannelBuilder::create('async'),
+                    // Configure to break connection on the third commit
+                    // First two commits should succeed, third should fail but recover
+                    ConnectionBreakingConfiguration::createWithBreakBeforeCommit([false, false, false, true]),
+                ])
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::ASYNCHRONOUS_PACKAGE, ModulePackageList::DBAL_PACKAGE])),
+            addInMemoryStateStoredRepository: false
         );
 
         // Send a command to ensure the deduplication table is created
-        $ecotoneLite->sendCommandWithRouting('singeInternalCommand', ['personId' => 99, 'personName' => 'Johny', 'exception' => false]);
-        $ecotoneLite->sendCommandWithRouting('singeInternalCommand', ['personId' => 100, 'personName' => 'Johny', 'exception' => false]);
+        $ecotoneLite->sendCommandWithRoutingKey('singeInternalCommand', ['personId' => 99, 'personName' => 'Johny', 'exception' => false]);
+        $ecotoneLite->sendCommandWithRoutingKey('singeInternalCommand', ['personId' => 100, 'personName' => 'Johny', 'exception' => false]);
 
         // Run with enough message handling attempts to process both commands
         // The second command will encounter a connection failure but should recover
-        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(handledMessageLimit: 5, executionTimeLimitInMilliseconds: 10000, stopOnError: false));
+        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(amountOfMessagesToHandle: 5, maxExecutionTimeInMilliseconds: 10000, failAtError: false));
 
         // Verify that despite the connection failure, at least one aggregate was successfully created
         try {
@@ -139,52 +141,59 @@ final class DbalTransactionAsynchronousEndpointTest extends DbalMessagingTestCas
         }
 
         // First, create a regular EcotoneLite instance to set up the database tables
-        $setupEcotoneLite = $this->bootstrapFlowTesting(
+        $setupEcotoneLite = EcotoneLite::bootstrapFlowTesting(
             [Person::class, MultipleInternalCommandsService::class],
             [
                 new MultipleInternalCommandsService(),
                 DbalConnectionFactory::class => $this->getORMConnectionFactory([__DIR__.'/../Fixture/ORM/Person']),
             ],
-            extensionObjects: [
-                DbalConfiguration::createWithDefaults()->withTransactionOnAsynchronousEndpoints(true)->withTransactionOnCommandBus(false)->withDoctrineORMRepositories(true),
-                DbalBackedMessageChannelBuilder::create('async'),
-                ServiceConfiguration::createWithDefaults()->withDefaultErrorChannel('dbal_dead_letter'),
-            ],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
-            addInMemoryStateStoredRepository: false,
-            licenceKey: LicenceTesting::VALID_LICENCE,
+            ServiceConfiguration::createWithDefaults()
+                ->withDefaultErrorChannel('dbal_dead_letter')
+                ->withExtensionObjects([
+                    DbalConfiguration::createWithDefaults()
+                        ->withTransactionOnAsynchronousEndpoints(true)
+                        ->withTransactionOnCommandBus(false)
+                        ->withDoctrineORMRepositories(true),
+                    DbalBackedMessageChannelBuilder::create('async'),
+                ])
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::ASYNCHRONOUS_PACKAGE, ModulePackageList::DBAL_PACKAGE])),
+            addInMemoryStateStoredRepository: false
         );
 
         // Send a command to ensure the deduplication table is created
-        $setupEcotoneLite->sendCommandWithRouting('multipleInternalCommands', [['personId' => 98, 'personName' => 'Setup', 'exception' => false]]);
-        $setupEcotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(handledMessageLimit: 1, stopOnError: false));
+        $setupEcotoneLite->sendCommandWithRoutingKey('multipleInternalCommands', [['personId' => 98, 'personName' => 'Setup', 'exception' => false]]);
+        $setupEcotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(amountOfMessagesToHandle: 1, failAtError: false));
 
         // Now create the actual test instance with the connection breaking module
-        $ecotoneLite = $this->bootstrapFlowTesting(
+        $ecotoneLite = EcotoneLite::bootstrapFlowTesting(
             [Person::class, MultipleInternalCommandsService::class, ConnectionBreakingModule::class],
             [
                 new MultipleInternalCommandsService(),
                 DbalConnectionFactory::class => $this->getORMConnectionFactory([__DIR__.'/../Fixture/ORM/Person']),
                 'logger' => new EchoLogger(),
             ],
-            extensionObjects: [
-                DbalConfiguration::createWithDefaults()->withTransactionOnAsynchronousEndpoints(true)->withTransactionOnCommandBus(false)->withDoctrineORMRepositories(true),
-                DbalBackedMessageChannelBuilder::create('async'),
-                ConnectionBreakingConfiguration::createWithBreakBeforeCommit([true, false]),
-                ServiceConfiguration::createWithDefaults()->withDefaultErrorChannel('dbal_dead_letter'),
-            ],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
-            addInMemoryStateStoredRepository: false,
-            licenceKey: LicenceTesting::VALID_LICENCE,
+            ServiceConfiguration::createWithDefaults()
+                ->withDefaultErrorChannel('dbal_dead_letter')
+                ->withExtensionObjects([
+                    DbalConfiguration::createWithDefaults()
+                        ->withTransactionOnAsynchronousEndpoints(true)
+                        ->withTransactionOnCommandBus(false)
+                        ->withDoctrineORMRepositories(true),
+                    DbalBackedMessageChannelBuilder::create('async'),
+                    // Configure to break connection during dead letter storage
+                    ConnectionBreakingConfiguration::createWithBreakBeforeCommit([true, false]),
+                ])
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::ASYNCHRONOUS_PACKAGE, ModulePackageList::DBAL_PACKAGE])),
+            addInMemoryStateStoredRepository: false
         );
 
-        $ecotoneLite->sendCommandWithRouting('singeInternalCommand', ['personId' => 100, 'personName' => 'Johny', 'exception' => true]);
+        $ecotoneLite->sendCommandWithRoutingKey('singeInternalCommand', ['personId' => 100, 'personName' => 'Johny', 'exception' => true]);
 
         /** @var DeadLetterGateway $deadLetter */
         $deadLetter = $ecotoneLite->getGateway(DeadLetterGateway::class);
         $initialCount = $deadLetter->count();
 
-        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(handledMessageLimit: 1, stopOnError: false));
+        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(amountOfMessagesToHandle: 1, failAtError: false));
 
         // After running, we should have one more dead letter than before
         $this->assertSame($initialCount + 1, $deadLetter->count());
@@ -192,38 +201,39 @@ final class DbalTransactionAsynchronousEndpointTest extends DbalMessagingTestCas
 
     public function test_turning_on_transactions_for_polling_consumer_with_tenant_connection()
     {
-        $connection = $this->getConnection();
-        (new EnqueueTableManager(EnqueueTableManager::DEFAULT_TABLE_NAME, true))->createTable($connection);
-        (new DocumentStoreTableManager(DbalDocumentStore::ECOTONE_DOCUMENT_STORE, true))->createTable($connection);
-        (new DeduplicationTableManager(DbalHandledMessages::DEFAULT_DEDUPLICATION_TABLE, true))->createTable($connection);
-
-        $ecotoneLite = $this->bootstrapFlowTesting(
+        $ecotoneLite = EcotoneLite::bootstrapFlowTesting(
             [Person::class, MultipleInternalCommandsService::class],
             [
                 new MultipleInternalCommandsService(),
                 'tenant_a_connection' => $this->getORMConnectionFactory([__DIR__.'/../Fixture/ORM/Person']),
             ],
-            extensionObjects: [
-                ServiceConfiguration::createWithDefaults()->withDefaultErrorChannel('nullChannel'),
-                \Ecotone\Api\JMSConverter\JMSConverterConfiguration::createWithDefaults()->withDefaultNullSerialization(false),
-                DbalConfiguration::createWithDefaults()->withTransactionOnAsynchronousEndpoints(true)->withTransactionOnCommandBus(false)->withDocumentStore(true, enableDocumentStoreStateStoredRepository:true),
-                DbalBackedMessageChannelBuilder::create('async'),
-                MultiTenantConfiguration::create('tenant', ['tenant_a' => 'tenant_a_connection'], ),
-            ],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE, ModulePackageList::JMS_CONVERTER_PACKAGE],
-            licenceKey: LicenceTesting::VALID_LICENCE,
-            addInMemoryStateStoredRepository: false,
+            ServiceConfiguration::createWithDefaults()
+                ->withExtensionObjects([
+                    ServiceConfiguration::createWithDefaults()
+                        ->withDefaultErrorChannel('nullChannel'),
+                    DbalConfiguration::createWithDefaults()
+                        ->withTransactionOnAsynchronousEndpoints(true)
+                        ->withTransactionOnCommandBus(false)
+                        ->withDocumentStore(true, enableDocumentStoreStandardRepository: true),
+                    DbalBackedMessageChannelBuilder::create('async'),
+                    MultiTenantConfiguration::create(
+                        'tenant',
+                        ['tenant_a' => 'tenant_a_connection'],
+                    ),
+                ])
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::ASYNCHRONOUS_PACKAGE, ModulePackageList::DBAL_PACKAGE, ModulePackageList::JMS_CONVERTER_PACKAGE])),
+            addInMemoryStateStoredRepository: false
         );
 
         /** This ensures for mysql that deduplication table will be created in first run and solves implicit commit */
-        $ecotoneLite->sendCommandWithRouting('multipleInternalCommands', [['personId' => 99, 'personName' => 'Johny', 'exception' => false]], metadata: ['tenant' => 'tenant_a']);
+        $ecotoneLite->sendCommandWithRoutingKey('multipleInternalCommands', [['personId' => 99, 'personName' => 'Johny', 'exception' => false]], metadata: ['tenant' => 'tenant_a']);
 
         /** Failure scenario */
-        $ecotoneLite->sendCommandWithRouting('multipleInternalCommands', [
+        $ecotoneLite->sendCommandWithRoutingKey('multipleInternalCommands', [
             ['personId' => 100, 'personName' => 'Johny', 'exception' => false],
             ['personId' => 101, 'personName' => 'Johny', 'exception' => true],
         ], metadata: ['tenant' => 'tenant_a']);
-        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(handledMessageLimit: 2, executionTimeLimitInMilliseconds: 5000, stopOnError: false));
+        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(amountOfMessagesToHandle: 2, maxExecutionTimeInMilliseconds: 5000, failAtError: false));
 
         /** Should be rolled back */
         $aggregateCommitted = true;
@@ -243,11 +253,11 @@ final class DbalTransactionAsynchronousEndpointTest extends DbalMessagingTestCas
         $this->assertFalse($aggregateCommitted);
 
         /** Success scenario */
-        $ecotoneLite->sendCommandWithRouting('multipleInternalCommands', [
+        $ecotoneLite->sendCommandWithRoutingKey('multipleInternalCommands', [
             ['personId' => 100, 'personName' => 'Johny', 'exception' => false],
             ['personId' => 101, 'personName' => 'Johny', 'exception' => false],
         ], metadata: ['tenant' => 'tenant_a']);
-        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(handledMessageLimit: 2, executionTimeLimitInMilliseconds: 5000, stopOnError: false));
+        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(amountOfMessagesToHandle: 2, maxExecutionTimeInMilliseconds: 5000, failAtError: false));
 
         $this->assertNotNull($ecotoneLite->sendQueryWithRouting('person.getName', metadata: ['aggregate.id' => 100, 'tenant' => 'tenant_a']));
         $this->assertNotNull($ecotoneLite->sendQueryWithRouting('person.getName', metadata: ['aggregate.id' => 101, 'tenant' => 'tenant_a']));
@@ -256,26 +266,29 @@ final class DbalTransactionAsynchronousEndpointTest extends DbalMessagingTestCas
 
     public function test_turning_on_transactions_for_polling_consumer_with_document_store()
     {
-        $ecotoneLite = $this->bootstrapFlowTesting(
+        $ecotoneLite = EcotoneLite::bootstrapFlowTesting(
             [Person::class, MultipleInternalCommandsService::class],
             [new MultipleInternalCommandsService(), DbalConnectionFactory::class => $this->connectionForTenantA()],
-            extensionObjects: [
-                DbalConfiguration::createWithDefaults()->withTransactionOnAsynchronousEndpoints(true)->withTransactionOnCommandBus(false)->withDocumentStore(true, enableDocumentStoreStateStoredRepository:true),
-                DbalBackedMessageChannelBuilder::create('async'),
-            ],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE, ModulePackageList::JMS_CONVERTER_PACKAGE],
-            licenceKey: LicenceTesting::VALID_LICENCE,
-            addInMemoryStateStoredRepository: false,
+            ServiceConfiguration::createWithDefaults()
+                ->withExtensionObjects([
+                    DbalConfiguration::createWithDefaults()
+                        ->withTransactionOnAsynchronousEndpoints(true)
+                        ->withTransactionOnCommandBus(false)
+                        ->withDocumentStore(true, enableDocumentStoreStandardRepository: true),
+                    DbalBackedMessageChannelBuilder::create('async'),
+                ])
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::ASYNCHRONOUS_PACKAGE, ModulePackageList::DBAL_PACKAGE, ModulePackageList::JMS_CONVERTER_PACKAGE])),
+            addInMemoryStateStoredRepository: false
         );
 
         /** This ensures for mysql that deduplication table will be created in first run and solves implicit commit */
-        $ecotoneLite->sendCommandWithRouting('multipleInternalCommands', [['personId' => 99, 'personName' => 'Johny', 'exception' => false]]);
-        $ecotoneLite->sendCommandWithRouting('multipleInternalCommands', [
+        $ecotoneLite->sendCommandWithRoutingKey('multipleInternalCommands', [['personId' => 99, 'personName' => 'Johny', 'exception' => false]]);
+        $ecotoneLite->sendCommandWithRoutingKey('multipleInternalCommands', [
             ['personId' => 100, 'personName' => 'Johny', 'exception' => false],
             ['personId' => 101, 'personName' => 'Johny', 'exception' => true],
         ]);
 
-        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(handledMessageLimit: 2, executionTimeLimitInMilliseconds: 5000, stopOnError: false));
+        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(amountOfMessagesToHandle: 2, maxExecutionTimeInMilliseconds: 5000, failAtError: false));
 
         /** Should be rolled back */
         $aggregateCommitted = true;
@@ -298,14 +311,6 @@ final class DbalTransactionAsynchronousEndpointTest extends DbalMessagingTestCas
 
     public function test_turning_on_transactions_for_polling_consumer_with_multiple_tenant_connections_and_document_store()
     {
-        foreach ([$this->connectionForTenantA(), $this->connectionForTenantB()] as $connectionFactory) {
-            $connection = $connectionFactory->createContext()->getDbalConnection();
-            (new EnqueueTableManager(EnqueueTableManager::DEFAULT_TABLE_NAME, true))->createTable($connection);
-            (new DocumentStoreTableManager(DbalDocumentStore::ECOTONE_DOCUMENT_STORE, true))->createTable($connection);
-            (new DeduplicationTableManager(DbalHandledMessages::DEFAULT_DEDUPLICATION_TABLE, true))->createTable($connection);
-            $this->setupUserTable($connection);
-        }
-
         $ecotoneLite = EcotoneLite::bootstrapFlowTesting(
             [Person::class, MultipleInternalCommandsService::class],
             [
@@ -313,29 +318,35 @@ final class DbalTransactionAsynchronousEndpointTest extends DbalMessagingTestCas
                 'tenant_a_connection' => $this->connectionForTenantA(),
                 'tenant_b_connection' => $this->connectionForTenantB(),
             ],
-            extensionObjects: [
-                ServiceConfiguration::createWithDefaults()->withDefaultErrorChannel('nullChannel'),
-                \Ecotone\Api\JMSConverter\JMSConverterConfiguration::createWithDefaults()->withDefaultNullSerialization(false),
-                DbalConfiguration::createWithDefaults()->withTransactionOnAsynchronousEndpoints(true)->withTransactionOnCommandBus(false)->withDocumentStore(true, enableDocumentStoreStateStoredRepository:true),
-                DbalBackedMessageChannelBuilder::create('async'),
-                MultiTenantConfiguration::create('tenant', ['tenant_a' => 'tenant_a_connection', 'tenant_b' => 'tenant_b_connection'], ),
-            ],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE, ModulePackageList::JMS_CONVERTER_PACKAGE],
-            licenceKey: LicenceTesting::VALID_LICENCE,
-            addInMemoryStateStoredRepository: false,
+            ServiceConfiguration::createWithDefaults()
+                ->withExtensionObjects([
+                    ServiceConfiguration::createWithDefaults()
+                        ->withDefaultErrorChannel('nullChannel'),
+                    DbalConfiguration::createWithDefaults()
+                        ->withTransactionOnAsynchronousEndpoints(true)
+                        ->withTransactionOnCommandBus(false)
+                        ->withDocumentStore(true, enableDocumentStoreStandardRepository: true),
+                    DbalBackedMessageChannelBuilder::create('async'),
+                    MultiTenantConfiguration::create(
+                        'tenant',
+                        ['tenant_a' => 'tenant_a_connection', 'tenant_b' => 'tenant_b_connection'],
+                    ),
+                ])
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::ASYNCHRONOUS_PACKAGE, ModulePackageList::DBAL_PACKAGE, ModulePackageList::JMS_CONVERTER_PACKAGE])),
+            addInMemoryStateStoredRepository: false
         );
 
         /** This ensures for mysql that deduplication table will be created in first run and solves implicit commit */
-        $ecotoneLite->sendCommandWithRouting('multipleInternalCommands', [['personId' => 99, 'personName' => 'Johny', 'exception' => false]], metadata: ['tenant' => 'tenant_a']);
-        $ecotoneLite->sendCommandWithRouting('multipleInternalCommands', [['personId' => 99, 'personName' => 'Johny', 'exception' => false]], metadata: ['tenant' => 'tenant_b']);
+        $ecotoneLite->sendCommandWithRoutingKey('multipleInternalCommands', [['personId' => 99, 'personName' => 'Johny', 'exception' => false]], metadata: ['tenant' => 'tenant_a']);
+        $ecotoneLite->sendCommandWithRoutingKey('multipleInternalCommands', [['personId' => 99, 'personName' => 'Johny', 'exception' => false]], metadata: ['tenant' => 'tenant_b']);
 
         /** Failure scenario */
-        $ecotoneLite->sendCommandWithRouting('multipleInternalCommands', [
+        $ecotoneLite->sendCommandWithRoutingKey('multipleInternalCommands', [
             ['personId' => 100, 'personName' => 'Johny', 'exception' => false],
             ['personId' => 101, 'personName' => 'Johny', 'exception' => true],
         ], metadata: ['tenant' => 'tenant_a']);
 
-        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(handledMessageLimit: 3, executionTimeLimitInMilliseconds: 10000, stopOnError: false));
+        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(amountOfMessagesToHandle: 3, maxExecutionTimeInMilliseconds: 10000, failAtError: false));
 
         /** Not created yet, as processed first two messages */
         $aggregateCommitted = true;
@@ -355,11 +366,11 @@ final class DbalTransactionAsynchronousEndpointTest extends DbalMessagingTestCas
         $this->assertFalse($aggregateCommitted);
 
         /** Success scenario */
-        $ecotoneLite->sendCommandWithRouting('multipleInternalCommands', [
+        $ecotoneLite->sendCommandWithRoutingKey('multipleInternalCommands', [
             ['personId' => 100, 'personName' => 'Johny', 'exception' => false],
             ['personId' => 101, 'personName' => 'Johny', 'exception' => false],
         ], metadata: ['tenant' => 'tenant_b']);
-        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(handledMessageLimit: 4, executionTimeLimitInMilliseconds: 10000, stopOnError: false));
+        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(amountOfMessagesToHandle: 4, maxExecutionTimeInMilliseconds: 10000, failAtError: false));
 
         /** Saved in tenant b */
         $this->assertNotNull($ecotoneLite->sendQueryWithRouting('person.getName', metadata: ['aggregate.id' => 100, 'tenant' => 'tenant_b']));
@@ -389,23 +400,26 @@ final class DbalTransactionAsynchronousEndpointTest extends DbalMessagingTestCas
 
     public function test_turning_off_transactions_for_polling_consumer()
     {
-        $ecotoneLite = $this->bootstrapFlowTesting(
+        $ecotoneLite = EcotoneLite::bootstrapFlowTesting(
             [Person::class, MultipleInternalCommandsService::class],
             [new MultipleInternalCommandsService(), DbalConnectionFactory::class => $this->getORMConnectionFactory([__DIR__.'/../Fixture/ORM/Person'])],
-            extensionObjects: [
-                DbalConfiguration::createWithDefaults()->withoutTransactionOnAsynchronousEndpoints(['async'])->withTransactionOnCommandBus(false)->withDoctrineORMRepositories(true),
-                DbalBackedMessageChannelBuilder::create('async'),
-            ],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE],
-            addInMemoryStateStoredRepository: false,
-            licenceKey: LicenceTesting::VALID_LICENCE,
+            ServiceConfiguration::createWithDefaults()
+                ->withExtensionObjects([
+                    DbalConfiguration::createWithDefaults()
+                        ->withoutTransactionOnAsynchronousEndpoints(['async'])
+                        ->withTransactionOnCommandBus(false)
+                        ->withDoctrineORMRepositories(true),
+                    DbalBackedMessageChannelBuilder::create('async'),
+                ])
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::ASYNCHRONOUS_PACKAGE, ModulePackageList::DBAL_PACKAGE])),
+            addInMemoryStateStoredRepository: false
         );
 
-        $ecotoneLite->sendCommandWithRouting('multipleInternalCommands', [
+        $ecotoneLite->sendCommandWithRoutingKey('multipleInternalCommands', [
             ['personId' => 100, 'personName' => 'Johny', 'exception' => false],
             ['personId' => 101, 'personName' => 'Johny', 'exception' => true],
         ]);
-        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(stopOnError: false));
+        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(failAtError: false));
 
         /** First should be inserted */
         $aggregateCommitted = true;
@@ -438,23 +452,29 @@ final class DbalTransactionAsynchronousEndpointTest extends DbalMessagingTestCas
         $connection = $connectionFactory->createContext()->getDbalConnection();
         $connection->executeStatement("INSERT INTO persons (person_id, name) VALUES (1, 'pre-existing')");
 
-        $ecotoneLite = $this->bootstrapFlowTesting(
+        $ecotoneLite = EcotoneLite::bootstrapFlowTesting(
             [CommandDispatchingAsyncHandler::class],
             [
                 $handler,
                 DbalConnectionFactory::class => $connectionFactory,
             ],
-            extensionObjects: [
-                DbalConfiguration::createWithDefaults()->withTransactionOnAsynchronousEndpoints(true)->withTransactionOnCommandBus(false),
-                DbalBackedMessageChannelBuilder::create('async'),
-                InstantRetryConfiguration::createWithDefaults()->withCommandBusRetry(isEnabled:true, retryTimes:3)->withAsynchronousEndpointsRetry(false),
-            ],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE, ],
-            licenceKey: LicenceTesting::VALID_LICENCE,
+            ServiceConfiguration::createWithDefaults()
+                ->withExtensionObjects([
+                    DbalConfiguration::createWithDefaults()
+                        ->withTransactionOnAsynchronousEndpoints(true)
+                        ->withTransactionOnCommandBus(false),
+                    DbalBackedMessageChannelBuilder::create('async'),
+                    InstantRetryConfiguration::createWithDefaults()
+                        ->withCommandBusRetry(isEnabled: true, retryTimes: 3),
+                ])
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([
+                    ModulePackageList::ASYNCHRONOUS_PACKAGE,
+                    ModulePackageList::DBAL_PACKAGE,
+                ])),
         );
 
-        $ecotoneLite->sendCommandWithRouting('dispatch.sql.command', 'test');
-        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(handledMessageLimit: 1, stopOnError: false));
+        $ecotoneLite->sendCommandWithRoutingKey('dispatch.sql.command', 'test');
+        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(amountOfMessagesToHandle: 1, failAtError: false));
 
         $this->assertSame(
             1,
@@ -476,23 +496,29 @@ final class DbalTransactionAsynchronousEndpointTest extends DbalMessagingTestCas
         $connection = $connectionFactory->createContext()->getDbalConnection();
         $connection->executeStatement("INSERT INTO persons (person_id, name) VALUES (1, 'pre-existing')");
 
-        $ecotoneLite = $this->bootstrapFlowTesting(
+        $ecotoneLite = EcotoneLite::bootstrapFlowTesting(
             [CommandDispatchingAsyncHandler::class],
             [
                 $handler,
                 DbalConnectionFactory::class => $connectionFactory,
             ],
-            extensionObjects: [
-                DbalConfiguration::createWithDefaults()->withTransactionOnAsynchronousEndpoints(true)->withTransactionOnCommandBus(false),
-                DbalBackedMessageChannelBuilder::create('async'),
-                InstantRetryConfiguration::createWithDefaults()->withAsynchronousEndpointsRetry(isEnabled:true, retryTimes:3),
-            ],
-            enabledModules: [ModulePackageList::DBAL_PACKAGE, ],
-            licenceKey: LicenceTesting::VALID_LICENCE,
+            ServiceConfiguration::createWithDefaults()
+                ->withExtensionObjects([
+                    DbalConfiguration::createWithDefaults()
+                        ->withTransactionOnAsynchronousEndpoints(true)
+                        ->withTransactionOnCommandBus(false),
+                    DbalBackedMessageChannelBuilder::create('async'),
+                    InstantRetryConfiguration::createWithDefaults()
+                        ->withAsynchronousEndpointsRetry(isEnabled: true, retryTimes: 3),
+                ])
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([
+                    ModulePackageList::ASYNCHRONOUS_PACKAGE,
+                    ModulePackageList::DBAL_PACKAGE,
+                ])),
         );
 
-        $ecotoneLite->sendCommandWithRouting('dispatch.sql.command', 'test');
-        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(handledMessageLimit: 1, stopOnError: false));
+        $ecotoneLite->sendCommandWithRoutingKey('dispatch.sql.command', 'test');
+        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(amountOfMessagesToHandle: 1, failAtError: false));
 
         $this->assertSame(
             2,
