@@ -22,7 +22,6 @@ use Ecotone\Dbal\Database\DocumentStoreTableManager;
 use Ecotone\Dbal\Database\EnqueueTableManager;
 use Ecotone\Dbal\Deduplication\DbalHandledMessages;
 use Ecotone\Dbal\DocumentStore\DbalDocumentStore;
-use Ecotone\Messaging\Handler\Logger\EchoLogger;
 use Ecotone\Test\LicenceTesting;
 use Exception;
 use PHPUnit\Framework\Attributes\Group;
@@ -102,7 +101,6 @@ final class DbalTransactionAsynchronousEndpointTest extends DbalMessagingTestCas
             [
                 new MultipleInternalCommandsService(),
                 DbalConnectionFactory::class => $this->getORMConnectionFactory([__DIR__.'/../Fixture/ORM/Person']),
-                //                "logger" => new EchoLogger()
             ],
             extensionObjects: [
                 DbalConfiguration::createWithDefaults()->withTransactionOnAsynchronousEndpoints(true)->withTransactionOnCommandBus(false)->withDoctrineORMRepositories(true),
@@ -121,7 +119,7 @@ final class DbalTransactionAsynchronousEndpointTest extends DbalMessagingTestCas
 
         // Run with enough message handling attempts to process both commands
         // The second command will encounter a connection failure but should recover
-        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(handledMessageLimit: 5, executionTimeLimitInMilliseconds: 10000, stopOnError: false));
+        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithFinishWhenNoMessages(stopOnError: false)->withExecutionTimeLimitInMilliseconds(10000));
 
         // Verify that despite the connection failure, at least one aggregate was successfully created
         try {
@@ -169,7 +167,6 @@ final class DbalTransactionAsynchronousEndpointTest extends DbalMessagingTestCas
             [
                 new MultipleInternalCommandsService(),
                 DbalConnectionFactory::class => $this->getORMConnectionFactory([__DIR__.'/../Fixture/ORM/Person']),
-                'logger' => new EchoLogger(),
             ],
             extensionObjects: [
                 DbalConfiguration::createWithDefaults()->withTransactionOnAsynchronousEndpoints(true)->withTransactionOnCommandBus(false)->withDoctrineORMRepositories(true),
@@ -229,7 +226,7 @@ final class DbalTransactionAsynchronousEndpointTest extends DbalMessagingTestCas
             ['personId' => 100, 'personName' => 'Johny', 'exception' => false],
             ['personId' => 101, 'personName' => 'Johny', 'exception' => true],
         ], metadata: ['tenant' => 'tenant_a']);
-        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(handledMessageLimit: 2, executionTimeLimitInMilliseconds: 5000, stopOnError: false));
+        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithFinishWhenNoMessages(stopOnError: false)->withExecutionTimeLimitInMilliseconds(5000));
 
         /** Should be rolled back */
         $aggregateCommitted = true;
@@ -253,7 +250,7 @@ final class DbalTransactionAsynchronousEndpointTest extends DbalMessagingTestCas
             ['personId' => 100, 'personName' => 'Johny', 'exception' => false],
             ['personId' => 101, 'personName' => 'Johny', 'exception' => false],
         ], metadata: ['tenant' => 'tenant_a']);
-        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithTestingSetup(handledMessageLimit: 2, executionTimeLimitInMilliseconds: 5000, stopOnError: false));
+        $ecotoneLite->run('async', ExecutionPollingMetadata::createWithFinishWhenNoMessages(stopOnError: false)->withExecutionTimeLimitInMilliseconds(5000));
 
         $this->assertNotNull($ecotoneLite->sendQueryWithRouting('person.getName', metadata: ['aggregate.id' => 100, 'tenant' => 'tenant_a']));
         $this->assertNotNull($ecotoneLite->sendQueryWithRouting('person.getName', metadata: ['aggregate.id' => 101, 'tenant' => 'tenant_a']));

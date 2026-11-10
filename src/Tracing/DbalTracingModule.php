@@ -80,6 +80,7 @@ use Ecotone\Messaging\MessageConverter\DefaultHeaderMapper;
 use Ecotone\Messaging\Support\LicensingException;
 use Ecotone\Messaging\Support\MessageBuilder;
 use Ecotone\Modelling\MessageHandling\Distribution\DistributedMessageHandler;
+use Ecotone\Modelling\MessageHandling\Distribution\Pulse\PulseFeature;
 use Ecotone\Modelling\MessageHandling\Distribution\Pulse\PulseRequestBodyBuilder;
 use Ecotone\Modelling\MessageHandling\Distribution\Pulse\PulseSnapshot;
 use Ecotone\Modelling\MessageHandling\Distribution\Pulse\PulseSnapshotSectionRegistration;
@@ -112,6 +113,7 @@ final class DbalTracingModule extends NoExternalConfigurationModule implements A
 {
     private const REMOVE_EXPIRED_TRACES_CHANNEL = 'ecotone.tracing.removeExpiredTraces';
     private const USER_MESSAGE_GATEWAYS_POINTCUT = MessageGateway::class . '&&not(' . CommandBus::class . ')&&not(' . EventBus::class . ')&&not(' . QueryBus::class . ')';
+    private const FAILED_ATTEMPT_RECORDING_PRECEDENCE = Precedence::ERROR_CHANNEL_PRECEDENCE - 1;
 
     /**
      * @param string[] $flowStepCompletedSubscribers
@@ -197,6 +199,14 @@ final class DbalTracingModule extends NoExternalConfigurationModule implements A
                 )
             );
         }
+        $messagingConfiguration->registerAroundMethodInterceptor(
+            AroundInterceptorBuilder::create(
+                TraceRecordingInterceptor::class,
+                $interfaceToCallRegistry->getFor(TraceRecordingInterceptor::class, 'recordFailedAttemptHandedToErrorChannel'),
+                self::FAILED_ATTEMPT_RECORDING_PRECEDENCE,
+                AsynchronousRunningEndpoint::class
+            )
+        );
         $messagingConfiguration->registerAroundMethodInterceptor(
             AroundInterceptorBuilder::create(
                 TraceRecordingInterceptor::class,
@@ -317,7 +327,28 @@ final class DbalTracingModule extends NoExternalConfigurationModule implements A
             new DbalTableManagerReference(SpansTableManager::class, $connectionReference),
             new DbalTableManagerReference(PulseTrackingTableManager::class, $connectionReference),
         ];
-        if (self::flowTrackingOf($serviceExtensions) !== null) {
+        $flowTracking = self::flowTrackingOf($serviceExtensions);
+        if (ExtensionObjectResolver::resolve(PulseConfiguration::class, $serviceExtensions) !== []) {
+            $storage = $flowTracking?->inMemory ? 'in memory' : 'database, connection ' . $connectionReference;
+            $extensions[] = new PulseFeature(
+                package: ModulePackageList::DBAL_PACKAGE,
+                name: 'Flow tracking',
+                enabled: $flowTracking !== null,
+                settings: $flowTracking === null ? [] : [
+                    'Tracked flows' => $flowTracking->onlyRequestedFlows ? 'only flows a caller asks to track' : 'every flow',
+                    'Retention' => PulseFeature::durationOf($flowTracking->retention->inMilliseconds()),
+                    'Storage' => $storage,
+                    'Notifications' => PulseFeature::onOff($flowTracking->notifications),
+                    'Tracing gateway' => PulseFeature::onOff($flowTracking->tracingGateway),
+                ],
+                handlers: [],
+                hint: $flowTracking === null
+                    ? 'Flows are not recorded, so the Traces page has nothing to show for this service and a trace of another service stops where it reaches this one.'
+                    : sprintf('%s this service handles is recorded step by step (%s) and kept for %s, so the Traces page shows each run with its timing, its failures and the services it crossed.', $flowTracking->onlyRequestedFlows ? 'Every flow a caller asks to track' : 'Every flow', $storage, PulseFeature::durationOf($flowTracking->retention->inMilliseconds())),
+                configuration: 'FlowTrackingConfiguration::createWithDefaults()',
+            );
+        }
+        if ($flowTracking !== null) {
             $extensions[] = new SpanRecorderReference(StoringSpanRecorder::class);
             if (ExtensionObjectResolver::resolve(PulseConfiguration::class, $serviceExtensions) !== []) {
                 $extensions[] = new PulseSnapshotSectionRegistration(sectionName: 'tracing', serviceReference: PulseTracingStorage::class, tenantScoped: false);
